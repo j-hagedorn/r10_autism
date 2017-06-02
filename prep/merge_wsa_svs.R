@@ -21,8 +21,10 @@ waitlist_svs <-
   ) %>%
   select(ID,PIHP_CMH_Name,Referral_Date:Eligibility_End_Date) %>%
   left_join(svs, by = c("ID" = "MEDICAID_ID")) %>%
-  # Only include services after referral for autism
-  filter(FROM_DATE >= as.Date(Referral_Date)) %>%
+  filter(
+    FROM_DATE >= as.Date(Referral_Date) # Only after referral for autism
+    | is.na(FROM_DATE) == T # or if there is no service date 
+  ) %>%
   group_by(ID,PIHP_CMH_Name,CPT_CD,SERVICE_DESC,UNIT_TYPE,AUTISM_SRV) %>%
   summarize(units = sum(UNITS, na.rm = T))
 
