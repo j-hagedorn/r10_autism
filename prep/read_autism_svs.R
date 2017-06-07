@@ -1,4 +1,11 @@
 
+# Install packages if you need them
+if (!require("tidyverse")) install.packages("tidyverse")
+if (!require("stringr")) install.packages("stringr")
+if (!require("magrittr")) install.packages("magrittr")
+if (!require("lubridate")) install.packages("lubridate")
+
+# Load packages
 library(tidyverse); library(stringr); library(magrittr); library(lubridate)
 
 # Read in .csv files as dataframes
@@ -15,14 +22,15 @@ svs <- genesee %>% bind_rows(lapeer,sanilac,stclair)
 rm(csv_path); rm(genesee); rm(lapeer); rm(sanilac); rm(stclair)
 
 # Remove cols where all values are NA
-svs <- Filter(function(x)!all(is.na(x)), autism_svs)
+svs <- Filter(function(x)!all(is.na(x)), svs)
 
 # Clean colnames (rm spaces, other symbols, add underscore sep)
-names(svs) <- gsub(":", "", names(autism_svs))
-names(svs) <- gsub(" |-", "_", names(autism_svs))
+names(svs) <- gsub(":", "", names(svs))
+names(svs) <- gsub(" |-", "_", names(svs))
 
 # Clean data to prepare for analysis
-svs %<>%
+svs <-
+svs %>%
   # Clean Medicaid ID field
   mutate(
     # Trim lead / trail whitespace
