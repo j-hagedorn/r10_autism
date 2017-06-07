@@ -7,8 +7,11 @@
 #    with a plan (can pull as an excel extract) 
 #    and receiving services (they have this report now but requires calc) 
 
+filter(group_by(summarise(mutate(wsa))))
+
 wsa %>%
   filter(Status == "Open") %>%
+  group_by(PIHP_CMH_Name) %>%
   summarize(
     with_IPOS = sum(IPOSExists, na.rm = T),
     all = n()
