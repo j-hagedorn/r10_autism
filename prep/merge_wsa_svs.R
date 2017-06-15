@@ -46,4 +46,53 @@ waitlist_svs <-
 #    what is the amount of services and does it match their plan? 
 #    What is % of authorized hours that have been provided per person?
 
+#### Calculate ABA services per week per person ####
 
+# Define ABA codes
+aba_cpt <- c("0364T","0365T","0366T","0367T","0368T","0369T",
+             "0370T","0371T","0372T","0373T","0374T")
+
+aba_rx_hrs <- wsa_ipos %>% select(MEDICAID_ID = Beneficiary_ID,ABA_Hours)
+
+ipos_start <- wsa %>% filter(Status == "Open") %>% select(MEDICAID_ID = ID,IPOS_Start_Date)
+
+aba_week <-
+svs %>%
+  filter(CPT_CD %in% aba_cpt) %>%
+  droplevels() %>%
+  mutate(
+    # Recode unit type as numeric conversion factor
+    hr_conv = recode(
+      as.character(UNIT_TYPE),
+      `15 Minutes` = '0.25', 
+      `30 Minutes` = '0.5',
+      `Hour` = '1', 
+      `Up to 15 min` = '0.25',
+      `Encounter` = 'NA'
+    ),
+    hr_conv = as.numeric(hr_conv),
+    # Calculate hours
+    hrs = UNITS * hr_conv,
+    # Create week dates for grouping
+    week = floor_date(FROM_DATE, unit = "week")
+  ) %>%
+  select(PROVIDER_NAME,MEDICAID_ID,CPT_CD:FROM_DATE,week,UNITS,hrs) %>%
+  group_by(MEDICAID_ID,week) %>%
+  summarize(hrs = sum(hrs, na.rm = T)) %>%
+  # Get prescribed ABA hours from WSA IPOS
+  left_join(aba_rx_hrs, by = "MEDICAID_ID") %>%
+  # Get IPOS start date from WSA
+  left_join(ipos_start, by = "MEDICAID_ID") %>%
+  # Only include services if they occur after the IPOS Start Date
+  filter(week >= IPOS_Start_Date) %>%
+  mutate(
+    # Calculate difference between actual and prescribed hours
+    # Negative values indicate hours less than goal
+    diff = hrs - ABA_Hours
+  ) 
+
+rm(aba_rx_hrs);rm(ipos_start)
+
+# For fun
+library(plotly)
+aba_week %>% plot_ly(x = ~week, y = ~diff, color = ~MEDICAID_ID) %>% add_lines()
