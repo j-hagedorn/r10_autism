@@ -4,6 +4,8 @@ if (!require("tidyverse")) install.packages("tidyverse")
 if (!require("stringr")) install.packages("stringr")
 if (!require("magrittr")) install.packages("magrittr")
 if (!require("lubridate")) install.packages("lubridate")
+if (!require("plotly")) install.packages("plotly")
+
 
 # Load packages
 library(tidyverse); library(stringr); library(magrittr); library(lubridate)
