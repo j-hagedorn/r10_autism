@@ -2,12 +2,9 @@
 
 # Merge WSA Autism enrollee data with related service encounters
 
-
 # 1) % of autism waiver eligible individuals, active (enrolled in WSA) 
 #    with a plan (can pull as an excel extract) 
 #    and receiving services (they have this report now but requires calc) 
-
-filter(group_by(summarise(mutate(wsa))))
 
 wsa %>%
   filter(Status == "Open") %>%
@@ -18,7 +15,8 @@ wsa %>%
   ) %>%
   mutate(
     pct = round(with_IPOS / all * 100, digits = 1)
-  )
+  ) %>%
+  View()
 
 # 2) For each individual who is autism waiver eligible and on the waitlist, 
 #    what services are he/she receiving while they are waiting? At what frequency?
