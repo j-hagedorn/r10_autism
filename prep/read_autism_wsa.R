@@ -32,3 +32,27 @@ wsa %<>%
   
 # If closed and opened, client is given a new 'Case ID' 
 # but Medicaid ID (i.e. 'ID') should be the same
+
+# Read in data related to authorized units
+
+wsa_ipos <- read_excel(paste0(csv_path,"06-08-17 WSA IPOS Data Report.xls"), skip = 1)
+
+# Clean colnames (rm spaces, other symbols, add underscore sep)
+names(wsa_ipos) <- gsub(" |-|/", "_", names(wsa_ipos))
+names(wsa_ipos) <- gsub("[[:space:]]", "", names(wsa_ipos))
+
+wsa_ipos %<>%
+  mutate(
+    Case_ID = as.character(Case_ID)
+  ) %>%
+  mutate_at(
+    .cols = vars(Days_Without_IPOS,Next_IPOS_Due_In,ABA_Hours),
+    .funs = funs(as.numeric)
+  ) %>%
+  # Change all character columns to factors
+  mutate_if(is.character,as.factor) %>%
+  # Transform Y/N responses into logical vars
+  mutate_at(
+    .cols = vars(IPOS_Exists),
+    .funs = funs(. == "Yes")
+  )
