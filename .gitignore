@@ -4,3 +4,9 @@
 *.Ruserdata
 *.Rproj
 .Rproj.user
+
+# Exclude data files
+*.csv
+*.xls
+*.xlsx
+*.txt
