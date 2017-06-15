@@ -28,6 +28,7 @@ waitlist_svs <-
   filter(
     Status == "Open"
     & IPOSExists == F
+    & is.na(Eligibility_Date) == F
   ) %>%
   select(ID,PIHP_CMH_Name,Referral_Date:Eligibility_End_Date) %>%
   left_join(svs, by = c("ID" = "MEDICAID_ID")) %>%
@@ -38,7 +39,7 @@ waitlist_svs <-
     | is.na(FROM_DATE) == T 
   ) %>%
   group_by(ID,PIHP_CMH_Name,CPT_CD,SERVICE_DESC,UNIT_TYPE,AUTISM_SRV) %>%
-  # What is 
+  # What is the number of units received?
   summarize(units = sum(UNITS, na.rm = T))
 
 
