@@ -33,8 +33,8 @@ waitlist_svs <-
   select(ID,PIHP_CMH_Name,Referral_Date:Eligibility_End_Date) %>%
   left_join(svs, by = c("ID" = "MEDICAID_ID")) %>%
   filter(
-    # Only include services occurring after referral for autism
-    FROM_DATE >= as.Date(Referral_Date) 
+    # Only include services occurring after eligibility for autism
+    FROM_DATE >= as.Date(Eligibility_Date) 
     # or if there is no service date (to keep people who didn't receive svs)
     | is.na(FROM_DATE) == T 
   ) %>%
@@ -50,12 +50,18 @@ waitlist_svs <-
 #### Calculate ABA services per week per person ####
 
 # Define ABA codes
-aba_cpt <- c("0364T","0365T","0366T","0367T","0368T","0369T",
-             "0370T","0371T","0372T","0373T","0374T")
+aba_cpt <- c("S5108", # Old observation code
+             "H2019", # Older codes
+             "0364T","0365T","0366T","0367T","0372T","0373T","0374T",
+             "0368T","0369T") # Observation codes
+
+# Add U5 modifier filter (which should include TT and other secondary modifiers)
+
+aba_mod <- c("U5")
 
 aba_rx_hrs <- wsa_ipos %>% select(MEDICAID_ID = Beneficiary_ID,ABA_Hours)
 
-ipos_start <- wsa %>% filter(Status == "Open") %>% select(MEDICAID_ID = ID,IPOS_Start_Date)
+ipos_start <- wsa %>% filter(Status == "Open" & Currently_Inactive == F) %>% select(MEDICAID_ID = ID,IPOS_Start_Date)
 
 aba_week <-
 svs %>%
@@ -96,4 +102,9 @@ rm(aba_rx_hrs);rm(ipos_start)
 
 # For fun
 library(plotly)
-aba_week %>% plot_ly(x = ~week, y = ~diff, color = ~MEDICAID_ID) %>% add_lines()
+aba_week %>% plot_ly(x = ~week, y = ~diff) %>% add_lines(opacity = 0.5)
+
+
+#### Are we providing appropriate observation hours? ####
+
+# There should be 1 observation
