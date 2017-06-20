@@ -1,5 +1,7 @@
 # merge_wsa_svs.R #
 
+library(tidyverse); library(lubridate)
+
 # Merge WSA Autism enrollee data with related service encounters
 
 # 1) % of autism waiver eligible individuals, active (enrolled in WSA) 
@@ -51,7 +53,7 @@ waitlist_svs <-
 
 # Define ABA codes
 aba_cpt <- c("S5108", # Old observation code
-             "H2019", # Older codes
+             "H2019", # Old treatment codes
              "0364T","0365T","0366T","0367T","0372T","0373T","0374T",
              "0368T","0369T") # Observation codes
 
@@ -61,11 +63,17 @@ aba_mod <- c("U5")
 
 aba_rx_hrs <- wsa_ipos %>% select(MEDICAID_ID = Beneficiary_ID,ABA_Hours)
 
-ipos_start <- wsa %>% filter(Status == "Open" & Currently_Inactive == F) %>% select(MEDICAID_ID = ID,IPOS_Start_Date)
+ipos_start <- 
+  wsa %>% 
+  filter(Status == "Open" & Currently_Inactive == F) %>% 
+  select(MEDICAID_ID = ID,IPOS_Start_Date)
 
 aba_week <-
 svs %>%
-  filter(CPT_CD %in% aba_cpt) %>%
+  filter(
+    CPT_CD %in% aba_cpt
+    & USED_MOD == "U5" # Only include U5 modifier for Autism services
+  ) %>%
   droplevels() %>%
   mutate(
     # Recode unit type as numeric conversion factor
@@ -95,15 +103,22 @@ svs %>%
   mutate(
     # Calculate difference between actual and prescribed hours
     # Negative values indicate hours less than goal
-    diff = hrs - ABA_Hours
+    diff = hrs - ABA_Hours,
+    # Calculate % of prescribed hours received
+    pct = round(hrs / ABA_Hours * 100, digits = 1),
+    # Tag Compliant and Non-Compliant weeks
+    compliant = ifelse(between(pct,75,125),T,F)
   ) 
 
 rm(aba_rx_hrs);rm(ipos_start)
 
 # For fun
 library(plotly)
-aba_week %>% plot_ly(x = ~week, y = ~diff) %>% add_lines(opacity = 0.5)
 
+aba_week %>% 
+  plot_ly(x = ~week, y = ~pct,colors = c("#F2300F","#0B775E")) %>% 
+  add_lines(opacity = 0.5,color = ~compliant) %>%
+  add_trace(type = "scatter",color = ~compliant)
 
 #### Are we providing appropriate observation hours? ####
 
