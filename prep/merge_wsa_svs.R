@@ -57,10 +57,6 @@ aba_cpt <- c("S5108", # Old observation code
              "0364T","0365T","0366T","0367T","0372T","0373T","0374T",
              "0368T","0369T") # Observation codes
 
-# Add U5 modifier filter (which should include TT and other secondary modifiers)
-
-aba_mod <- c("U5")
-
 aba_rx_hrs <- wsa_ipos %>% select(MEDICAID_ID = Beneficiary_ID,ABA_Hours)
 
 ipos_start <- 
@@ -126,7 +122,29 @@ aba_week %>%
   plot_ly(x = ~week, y = ~pct,colors = c("#F2300F","#0B775E")) %>% 
   add_lines(opacity = 0.5,color = ~in_range_wk) %>%
   add_trace(type = "scatter", mode = "markers", color = ~in_range_wk) 
+
+
   
 #### Are we providing appropriate observation hours? ####
 
-# There should be 1 observation
+# According to the Autism Waiver requirements
+# For every 10 (units,encounters,hours?) of a treatment code 
+# from set {"0364T","0365T","0366T","0367T","0372T","0373T","0374T","H2019"} 
+# which are provided to an individual client, 
+# there should be 1 observation code from set {"S5108","0368T","0369T"}
+
+# Note: uses filters defined above for service codes and clients included
+
+observe <-
+svs %>%
+  filter(
+    CPT_CD %in% aba_cpt
+    & USED_MOD == "U5" # Only include U5 modifier for Autism services
+  ) %>%
+  droplevels() %>%
+  # Get prescribed ABA hours from WSA IPOS
+  left_join(aba_rx_hrs, by = "MEDICAID_ID") %>%
+  # Get IPOS start date from WSA
+  left_join(ipos_start, by = "MEDICAID_ID") %>%
+  # Only include services if they occur after the IPOS Start Date
+  filter(week >= IPOS_Start_Date)
