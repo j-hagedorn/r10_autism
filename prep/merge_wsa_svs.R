@@ -107,7 +107,12 @@ svs %>%
     # Calculate % of prescribed hours received
     pct = round(hrs / ABA_Hours * 100, digits = 1),
     # Tag Compliant and Non-Compliant weeks
-    compliant = ifelse(between(pct,75,125),T,F)
+    in_range_wk = ifelse(between(pct,75,125),T,F)
+  ) %>%
+  group_by(MEDICAID_ID) %>%
+  mutate(
+    pct_all = round(sum(hrs) / sum(ABA_Hours) * 100, digits = 1),
+    in_range_all = ifelse(between(pct_all,75,125),T,F)
   ) 
 
 rm(aba_rx_hrs);rm(ipos_start)
@@ -115,11 +120,13 @@ rm(aba_rx_hrs);rm(ipos_start)
 # For fun
 library(plotly)
 
+p <-
 aba_week %>% 
+  filter(in_range_all == F) %>%
   plot_ly(x = ~week, y = ~pct,colors = c("#F2300F","#0B775E")) %>% 
-  add_lines(opacity = 0.5,color = ~compliant) %>%
-  add_trace(type = "scatter",color = ~compliant)
-
+  add_lines(opacity = 0.5,color = ~in_range_wk) %>%
+  add_trace(type = "scatter", mode = "markers", color = ~in_range_wk) 
+  
 #### Are we providing appropriate observation hours? ####
 
 # There should be 1 observation
