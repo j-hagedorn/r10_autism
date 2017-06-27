@@ -12,11 +12,11 @@ wsa %>%
   filter(Status == "Open") %>%
   group_by(PIHP_CMH_Name) %>%
   summarize(
-    with_IPOS = sum(IPOSExists, na.rm = T),
+    without_IPOS = n() - sum(IPOSExists, na.rm = T),
     all = n()
   ) %>%
   mutate(
-    pct = round(with_IPOS / all * 100, digits = 1)
+    pct = round(without_IPOS / all * 100, digits = 1)
   ) %>%
   View()
 
@@ -118,8 +118,8 @@ library(plotly)
 
 p <-
 aba_week %>% 
-  filter(in_range_all == F) %>%
-  plot_ly(x = ~week, y = ~pct,colors = c("#F2300F","#0B775E")) %>% 
+  filter(in_range_all == T) %>%
+  plot_ly(x = ~week, y = ~pct, colors = c("#F2300F","#0B775E")) %>% 
   add_lines(opacity = 0.5,color = ~in_range_wk) %>%
   add_trace(type = "scatter", mode = "markers", color = ~in_range_wk) 
 
@@ -142,9 +142,60 @@ svs %>%
     & USED_MOD == "U5" # Only include U5 modifier for Autism services
   ) %>%
   droplevels() %>%
+  mutate(
+    # Recode unit type as numeric conversion factor
+    hr_conv = recode(
+      as.character(UNIT_TYPE),
+      `15 Minutes` = '0.25', 
+      `30 Minutes` = '0.5',
+      `Hour` = '1', 
+      `Up to 15 min` = '0.25',
+      `Encounter` = 'NA'
+    ),
+    hr_conv = as.numeric(hr_conv),
+    # Calculate hours
+    hrs = UNITS * hr_conv,
+    # Create week dates for grouping
+    week = floor_date(FROM_DATE, unit = "week"),
+    month = floor_date(FROM_DATE, unit = "month")
+  ) %>%
   # Get prescribed ABA hours from WSA IPOS
   left_join(aba_rx_hrs, by = "MEDICAID_ID") %>%
   # Get IPOS start date from WSA
   left_join(ipos_start, by = "MEDICAID_ID") %>%
   # Only include services if they occur after the IPOS Start Date
-  filter(week >= IPOS_Start_Date)
+  filter(week >= IPOS_Start_Date) %>%
+  mutate(
+    type = recode(
+      CPT_CD,
+      `S5108` = "Observation",
+      `0368T` = "Observation",
+      `0369T` = "Observation",
+      `0364T` = "Treatment",
+      `0365T` = "Treatment",
+      `0366T` = "Treatment",
+      `0367T` = "Treatment",
+      `0372T` = "Treatment",
+      `0373T` = "Treatment",
+      `0374T` = "Treatment",
+      `H2019` = "Treatment"
+    )
+  ) %>%
+  select(
+    MEDICAID_ID,PROVIDER_NAME,type,CPT_CD,SERVICE_DESC,
+    month,week,FROM_DATE,UNITS,hrs
+  ) %>%
+  group_by(MEDICAID_ID,PROVIDER_NAME,type) %>%
+  summarize(hrs = sum(hrs)) %>%
+  ungroup() %>%
+  spread(type, hrs) %>%
+  mutate(
+    obs_ratio = Observation / Treatment,
+    meets_req = obs_ratio >= 0.1
+  ) %>%
+  group_by(PROVIDER_NAME) %>%
+  summarize(
+    meets_req = sum(meets_req),
+    n = n()
+  ) %>%
+  mutate(pct = round(meets_req / n * 100, digits = 1))
