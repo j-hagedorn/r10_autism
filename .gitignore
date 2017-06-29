@@ -10,3 +10,8 @@
 *.xls
 *.xlsx
 *.txt
+
+# Exclude analysis output
+*.html
+*.docx
+*.doc
