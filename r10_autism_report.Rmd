@@ -9,6 +9,8 @@ output:
 knitr::opts_chunk$set(echo=TRUE, message=FALSE, warning=FALSE)
 ```
 
+**Please note that this is currently a draft report under development with analysts at Region 10 PIHP**
+
 ```{r}
 # Install packages if you need them
 # if (!require("tidyverse")) install.packages("tidyverse")
@@ -271,7 +273,48 @@ waitlist_svs <-
 
 ## Summary of Services per Enrollee
 
+The table below shows a summary of services received by each enrollee in the waiver who has been placed on the waitlist.  It includes the following information:
+
+- *Services provided:*  A list of services that the person has received
+- *Days on waitlist:* The number of days between the enrollee's eligibility date and the most recent service date included in the services data extract (for any enrollee)
+- *Days receiving services:*  The number of days between the earliest occurrence of any service following the person's eligibility date and the latest occurrence of any service
+- *Percent days covered:* The percentage of the days that the person has been on the waitlist that are overlapped by the provision of services (i.e. `Days receiving services`/`Days on waitlist`)
+- *Approximate hours:* The total number of hours of services received of any service that can be converted to a standard hour measurement.  This does not include units with the unit type of `Encounter` unless the time amount is specified in the service name.  It therefore *under*estimates the actual amount of services.
+
+
 ```{r}
+waitlist_person <-
+  waitlist_svs %>%
+  group_by(ID) %>%
+  summarize(
+    first = min(first),
+    last = max(last),
+    Eligibility_Date = as.Date(max(Eligibility_Date)),
+    svs_list = paste(SERVICE_DESC, collapse = ', '),
+    hrs = sum(hrs)
+  ) %>%
+  mutate(
+    # Most recent date in services data pulled
+    max_date = max(svs$FROM_DATE),
+    elig_interval = as.numeric(max_date - Eligibility_Date),
+    svs_interval = as.numeric(last - first),
+    pct_days_svd = round(svs_interval/elig_interval * 100, digits = 1)
+  )
+
+waitlist_person %>%
+  select(ID,svs_list,elig_interval,svs_interval,pct_days_svd,hrs) %>%
+  ungroup() %>%
+  arrange(pct_days_svd) %>%
+  datatable(
+    rownames = FALSE,
+    colnames = c('Enrollee ID','Services provided','Days on waitlist','Days receiving services','Percent days covered','Approximate hours'),
+    caption = 'Service coverage for individuals on Autism Waiver waitlist, by Enrollee',
+    extensions = c('Responsive','Buttons'),
+    options = list(
+      dom = 't',
+      buttons = c('colvis')
+    )
+  )
 
 ```
 
@@ -352,7 +395,7 @@ min_waitlist_svs <-
 
 # Conformance with Prescribed Hours for ABA Services
 
-For individuals who are receiving autism waiver services, what is the amount of services and does it match their plan?  The bar chart below shows the percentage of authorized hours of ABA that have been provided for each active autism waiver enrollee over the past 90 days.
+For individuals who are receiving autism waiver services, what is the amount of services and does it match their plan?  The bar chart below shows the percentage of authorized hours of ABA that have been provided for each active autism waiver enrollee over the past 90 days.  Individuals whose services fall outside of the acceptable range (*i.e. <75% or >125%*) of the prescribed hours are differentiated by color.
 
 ```{r}
 
@@ -458,7 +501,15 @@ aba_per %>%
 The individuals whose ABA service hours are outside of the prescribed range are shown in the table below:
 
 ```{r}
-aba_per %>% filter(in_range == F) %>% datatable()
+aba_per %>% 
+  filter(in_range == F) %>% 
+  select(-in_range) %>%
+  arrange(desc(pct)) %>%
+  datatable(
+    rownames = FALSE,
+    colnames = c('Enrollee ID','Hours of service','Prescribed Hours','Percent of prescribed hrs'),
+    caption = 'Autism waiver enrollees receiving services outside of prescribed range'
+  )
 ```
 
 
@@ -467,8 +518,6 @@ aba_per %>% filter(in_range == F) %>% datatable()
 According to the Autism Waiver requirements, for every 10 hours of treatment provided (*including codes from the following:* `0364T`:`0367T`,`0372T`:`0374T`,`H2019`) to an individual client, there should be 1 hour of observation (*including codes from the following:* `S5108`,`0368T`,`0369T`).  The table below shows the percentage of active autism waiver clients at each CMHSP 
 
 ```{r}
-#### Are we providing appropriate observation hours? ####
-
 # Note: uses filters defined above for service codes and clients included
 
 observe <-
@@ -501,6 +550,8 @@ svs %>%
   left_join(ipos_start, by = "MEDICAID_ID") %>%
   # Only include services if they occur after the IPOS Start Date
   filter(week >= IPOS_Start_Date) %>%
+  # Only include services if they are in most recent 90 days of dataset
+  filter(FROM_DATE >= last_90) %>%
   mutate(
     type = recode(
       CPT_CD,
@@ -531,7 +582,7 @@ svs %>%
   ) %>%
   group_by(PROVIDER_NAME) %>%
   summarize(
-    meets_req = sum(meets_req),
+    meets_req = sum(meets_req, na.rm = T),
     n = n()
   ) %>%
   mutate(pct = round(meets_req / n * 100, digits = 1)) 

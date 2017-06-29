@@ -26,6 +26,11 @@ wsa %>%
 # The df created below shows services received since eligibility date (for those on the wait list) - 
 # It includes one row for each service code by individual; 
 
+setdiff(
+  unique(wsa$ID[wsa$Status == "Open"]),
+  unique(svs$MEDICAID_ID)
+)
+
 waitlist_svs <-
   wsa %>%
   # Filter individuals who are on waitlist
