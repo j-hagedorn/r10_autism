@@ -515,7 +515,7 @@ aba_per %>%
 
 # Required Observation of ABA Services
 
-According to the Autism Waiver requirements, for every 10 hours of treatment provided (*including codes from the following:* `0364T`:`0367T`,`0372T`:`0374T`,`H2019`) to an individual client, there should be 1 hour of observation (*including codes from the following:* `S5108`,`0368T`,`0369T`).  The table below shows the percentage of active autism waiver clients at each CMHSP 
+According to the Autism Waiver requirements, for every 10 hours of treatment provided (*including codes from the following:* `0364T`:`0367T`,`0372T`:`0374T`,`H2019`) to an individual client, there should be 1 hour of observation (*including codes from the following:* `S5108`,`0368T`,`0369T`).  The table below shows the percentage of active autism waiver clients at each CMHSP who have received at least the required ratio of treatment to observation (10:1) during the most recent 90 days of available service data.  Individuals with fewer than 10 hours of treatment during this period are omitted from the calculations.
 
 ```{r}
 # Note: uses filters defined above for service codes and clients included
@@ -576,6 +576,8 @@ svs %>%
   summarize(hrs = sum(hrs)) %>%
   ungroup() %>%
   spread(type, hrs) %>%
+  # Exclude cases with < 10 hours of treatment
+  filter(Treatment >= 10) %>%
   mutate(
     obs_ratio = Observation / Treatment,
     meets_req = obs_ratio >= 0.1
