@@ -25,7 +25,6 @@ library(tidyverse); library(stringr); library(magrittr); library(lubridate); lib
 library(DT); library(forcats); library(plotly)
 ```
 
-
 # Reading in Data
 
 The data for these analyses is drawn from two primary sources: 
@@ -33,7 +32,7 @@ The data for these analyses is drawn from two primary sources:
 - *Service data* from the region's MIX EMR system and 
 - *Waiver enrollment* reports generated from the MDHHS WSA system.
 
-First, we read in the services data and process it for analysis.  Note that we are currently reading from .csv file output for this draft analysis.  A repeatable, automated process will rely on connection to database tables updated via ETL.
+First, we read in the services data and process it for analysis.  Note that we are currently reading from .csv file output for this draft analysis.  A repeatable, automated process will rely on connection to database tables updated via an extract-transfer-load (ETL) process.
 
 ```{r}
 # Read in .csv files as dataframes
@@ -166,7 +165,7 @@ wsa_ipos %<>%
 
 ---
 
-# Eligible Autism Waiver Enrollees Receiving services
+# Eligible Autism Waiver Enrollees without a Plan of Service
 
 As an initial summary, we look at the percent of persons who are enrolled in the autism waiver (i.e. `Status == "Open"`), but who do not have an Individualized Plan of Service (IPOS).
 
@@ -215,19 +214,18 @@ The following analyses will ask different questions for the groups represented h
 
 ## Services per Enrollee on Waitlist
 
-For each individual who is autism waiver eligible and on the waitlist, what services are he/she receiving while they are waiting? At what frequency? 
+For each individual who is autism waiver eligible and on the waitlist, what non-ABA services are he/she receiving while they are waiting? At what frequency? 
 
 ```{r}
 waitlist_svs <-
   wsa %>%
   # Filter individuals who are on waitlist
-  # Is this an accurate way to get at these individuals?
   filter(
     Status == "Open"
     & IPOSExists == F
     & is.na(Eligibility_Date) == F
   ) %>%
-  select(ID,PIHP_CMH_Name,Referral_Date:Eligibility_End_Date) %>%
+  select(ID,Case_ID,PIHP_CMH_Name,Referral_Date:Eligibility_End_Date) %>%
   left_join(svs, by = c("ID" = "MEDICAID_ID")) %>%
   filter(
     # Only include services occurring after eligibility for autism
@@ -235,7 +233,7 @@ waitlist_svs <-
     # or if there is no service date (to keep people who didn't receive svs)
     | is.na(FROM_DATE) == T 
   ) %>%
-  group_by(ID,PIHP_CMH_Name,CPT_CD,SERVICE_DESC,UNIT_TYPE,AUTISM_SRV,Eligibility_Date) %>%
+  group_by(Case_ID,PIHP_CMH_Name,CPT_CD,SERVICE_DESC,UNIT_TYPE,AUTISM_SRV,Eligibility_Date) %>%
   # Convert units to a common period
   mutate(
     # Recode unit type as numeric conversion factor
@@ -273,7 +271,7 @@ waitlist_svs <-
 
 ## Summary of Services per Enrollee
 
-The table below shows a summary of services received by each enrollee in the waiver who has been placed on the waitlist.  It includes the following information:
+The table below shows a summary of services received by each enrollee in the waiver who has been placed on the waitlist.^[]  It includes the following information:
 
 - *Services provided:*  A list of services that the person has received
 - *Days on waitlist:* The number of days between the enrollee's eligibility date and the most recent service date included in the services data extract (for any enrollee)
@@ -285,7 +283,7 @@ The table below shows a summary of services received by each enrollee in the wai
 ```{r}
 waitlist_person <-
   waitlist_svs %>%
-  group_by(ID) %>%
+  group_by(Case_ID) %>%
   summarize(
     first = min(first),
     last = max(last),
@@ -302,7 +300,7 @@ waitlist_person <-
   )
 
 waitlist_person %>%
-  select(ID,svs_list,elig_interval,svs_interval,pct_days_svd,hrs) %>%
+  select(Case_ID,svs_list,elig_interval,svs_interval,pct_days_svd,hrs) %>%
   ungroup() %>%
   arrange(pct_days_svd) %>%
   datatable(
@@ -331,18 +329,17 @@ In order to ensure support for Autism Waiver enrollees who are currently on the 
 ```{r}
 
 # Select field from WSA to join in later
-wsa_elig_dt <- wsa %>% select(ID,Eligibility_Date)
+wsa_elig_dt <- wsa %>% select(Case_ID,Eligibility_Date)
 
 min_waitlist_svs <-
   wsa %>%
   # Filter individuals who are on waitlist
-  # Is this an accurate way to get at these individuals?
   filter(
     Status == "Open"
     & IPOSExists == F
     & is.na(Eligibility_Date) == F
   ) %>%
-  select(ID,PIHP_CMH_Name,Referral_Date:Eligibility_End_Date) %>%
+  select(ID,Case_ID,PIHP_CMH_Name,Referral_Date:Eligibility_End_Date) %>%
   left_join(svs, by = c("ID" = "MEDICAID_ID")) %>%
   filter(
     # Only include services occurring after eligibility for autism
@@ -360,17 +357,17 @@ min_waitlist_svs <-
   ) %>%
   droplevels() %>%
   ungroup() %>%
-  group_by(month,ID,CPT_CD) %>%
+  group_by(month,Case_ID,CPT_CD) %>%
   summarize(units = sum(UNITS, na.rm = T)) %>%
   ungroup() %>%
   # Create a dataframe with all combinations of the vars listed
   # in order to ensure that months without services are identified
-  complete(month,ID,CPT_CD) %>%
-  group_by(ID,month) %>%
+  complete(month,Case_ID,CPT_CD) %>%
+  group_by(Case_ID,month) %>%
   # Spread to show one row per person per month
   spread(CPT_CD,units) %>%
   # Join back to get eligibility date to filter months for each person that precede
-  left_join(wsa_elig_dt, by = "ID") %>%
+  left_join(wsa_elig_dt, by = "Case_ID") %>%
   filter(month >= floor_date(Eligibility_Date, unit = "month")) %>%
   # Convert NA values to zeroes
   mutate_at(
@@ -385,11 +382,11 @@ min_waitlist_svs <-
     med_rvw = `90792` + `99212` + `99213` + `99214` + `99215`,
     fam_svs = `0370T`
   ) %>%
-  select(ID,month,cm,cls,respite,med_rvw,fam_svs) %>%
+  select(Case_ID,month,cm,cls,respite,med_rvw,fam_svs) %>%
   mutate(
     min_svs = cm >= 1 & cls >= 1 & respite >= 1 & med_rvw >= 1 & fam_svs >= 1
   ) %>%
-  arrange(ID, month)
+  arrange(Case_ID, month)
 ```
 
 
@@ -407,7 +404,7 @@ aba_cpt <- c("S5108", # Old observation code
              "0364T","0365T","0366T","0367T","0372T","0373T","0374T",
              "0368T","0369T") # Observation codes
 
-aba_rx_hrs <- wsa_ipos %>% select(MEDICAID_ID = Beneficiary_ID,ABA_Hours)
+aba_rx_hrs <- wsa_ipos %>% select(MEDICAID_ID = Beneficiary_ID,Case_ID,ABA_Hours)
 
 ipos_start <- 
   wsa %>% 
@@ -451,7 +448,7 @@ aba_week <-
   filter(FROM_DATE >= IPOS_Start_Date) %>%
   # Only include services if they are in most recent 90 days of dataset
   filter(FROM_DATE >= last_90) %>%
-  group_by(MEDICAID_ID,week) %>%
+  group_by(Case_ID,week) %>%
   summarize(
     hrs = sum(hrs, na.rm = T),
     ABA_Hours = max(ABA_Hours, na.rm = T)
@@ -466,7 +463,7 @@ aba_week <-
     in_range_wk = ifelse(between(pct,75,125),T,F)
   ) %>%
   ungroup() %>%
-  group_by(MEDICAID_ID) %>%
+  group_by(Case_ID) %>%
   mutate(
     pct_all = round(sum(hrs) / sum(ABA_Hours) * 100, digits = 1),
     in_range_all = ifelse(between(pct_all,75,125),T,F)
@@ -474,7 +471,7 @@ aba_week <-
 
 aba_per <-
   aba_week %>%
-  group_by(MEDICAID_ID) %>%
+  group_by(Case_ID) %>%
   summarize(
     hrs = sum(hrs, na.rm = T),
     rx_hrs = sum(ABA_Hours, na.rm = T)
@@ -486,10 +483,10 @@ aba_per <-
 
 aba_per %>%
   mutate(
-    MEDICAID_ID = fct_reorder(MEDICAID_ID,desc(pct)),
+    Case_ID = fct_reorder(Case_ID,desc(pct)),
     in_range = ifelse(in_range == T,"Within range","Out of range")
   ) %>%
-  plot_ly(x = ~MEDICAID_ID, y = ~pct, color = ~in_range, colors = c("#b0145b","#088da5")) %>%
+  plot_ly(x = ~Case_ID, y = ~pct, color = ~in_range, colors = c("#b0145b","#088da5")) %>%
   layout(
     title = "Percent of prescribed hours of ABA services received in last 90 days",
     xaxis = list(title = "Autism Waiver Enrollee",zeroline = F,showline = F,showticklabels = F,showgrid = F), 
@@ -515,7 +512,7 @@ aba_per %>%
 
 # Required Observation of ABA Services
 
-According to the Autism Waiver requirements, for every 10 hours of treatment provided (*including codes from the following:* `0364T`:`0367T`,`0372T`:`0374T`,`H2019`) to an individual client, there should be 1 hour of observation (*including codes from the following:* `S5108`,`0368T`,`0369T`).  The table below shows the percentage of active autism waiver clients at each CMHSP who have received at least the required ratio of treatment to observation (10:1) during the most recent 90 days of available service data.  Individuals with fewer than 10 hours of treatment during this period are omitted from the calculations.
+According to the Autism Waiver requirements, for every 10 hours of treatment provided (*including codes from the following:* `0364T`:`0367T`,`0372T`:`0374T`,`H2019`) to an individual client, there should be 1 hour of observation by a licensed practitioner(*including codes from the following:* `S5108`,`0368T`,`0369T`).  The table below shows the percentage of active autism waiver clients at each CMHSP who have received at least the required ratio of treatment to observation (10:1) during the most recent 90 days of available service data.  Individuals with fewer than 10 hours of treatment during this period are omitted from the calculations.
 
 ```{r}
 # Note: uses filters defined above for service codes and clients included
