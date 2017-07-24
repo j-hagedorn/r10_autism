@@ -262,6 +262,7 @@ waitlist_svs <-
   ) %>%
   # What is the number of units received?
   summarize(
+    encounters = n(),
     units = sum(UNITS, na.rm = T),
     hrs = sum(hrs, na.rm = T),
     first = min(FROM_DATE),
@@ -289,7 +290,7 @@ waitlist_person <-
     last = max(last),
     Eligibility_Date = as.Date(max(Eligibility_Date)),
     svs_list = paste(SERVICE_DESC, collapse = ', '),
-    hrs = sum(hrs)
+    encounters = sum(encounters)
   ) %>%
   mutate(
     # Most recent date in services data pulled
@@ -300,12 +301,12 @@ waitlist_person <-
   )
 
 waitlist_person %>%
-  select(Case_ID,svs_list,elig_interval,svs_interval,pct_days_svd,hrs) %>%
+  select(Case_ID,svs_list,elig_interval,svs_interval,pct_days_svd,encounters) %>%
   ungroup() %>%
   arrange(pct_days_svd) %>%
   datatable(
     rownames = FALSE,
-    colnames = c('Enrollee ID','Services provided','Days on waitlist','Days receiving services','Percent days covered','Approximate hours'),
+    colnames = c('Enrollee ID','Services provided','Days on waitlist','Days receiving services','Percent days covered','Number of encounters'),
     caption = 'Service coverage for individuals on Autism Waiver waitlist, by Enrollee',
     extensions = c('Responsive','Buttons'),
     options = list(
