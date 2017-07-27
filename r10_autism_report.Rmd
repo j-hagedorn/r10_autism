@@ -494,27 +494,30 @@ svs %>%
     )
   ) %>%
   select(
-    MEDICAID_ID,PROVIDER_NAME,type,CPT_CD,SERVICE_DESC,
+    Case_ID,PROVIDER_NAME,type,CPT_CD,SERVICE_DESC,
     month,week,FROM_DATE,UNITS,hrs
   ) %>%
-  group_by(MEDICAID_ID,PROVIDER_NAME,type) %>%
+  group_by(Case_ID,PROVIDER_NAME,type) %>%
   summarize(hrs = sum(hrs)) %>%
   ungroup() %>%
   spread(type, hrs) %>%
   # Exclude cases with < 10 hours of treatment
   filter(Treatment >= 10) %>%
   mutate(
-    obs_ratio = Observation / Treatment,
-    meets_req = obs_ratio >= 0.1
-  ) %>%
+    obs_ratio = round(Observation / Treatment, digits = 2),
+    meets_req = obs_ratio >= 0.1 & obs_ratio <= 1.0
+  ) 
+
+observe_agg <-
+observe %>%
   group_by(PROVIDER_NAME) %>%
   summarize(
     meets_req = sum(meets_req, na.rm = T),
     n = n()
   ) %>%
   mutate(pct = round(meets_req / n * 100, digits = 1)) 
-
-observe %>% 
+  
+observe_agg %>%  
   datatable(
     rownames = FALSE,
     colnames = c('CMHSP','Enrollees with required observation','All Enrollees','Percent meeting standard'),
@@ -527,10 +530,32 @@ observe %>%
   ) %>%
   formatStyle(
     'pct',
-    background = styleColorBar(observe$pct, 'grey'),
+    background = styleColorBar(observe_agg$pct, 'grey'),
     backgroundSize = '100% 90%',
     backgroundRepeat = 'no-repeat',
     backgroundPosition = 'center'
+  )
+
+```
+
+For a detailed view of the individuals who have not received the appropriate level of observation for ABA services, please see the table below:
+
+```{r}
+
+
+observe %>%
+  filter(meets_req == F) %>%
+  select(-meets_req) %>%
+  arrange(desc(obs_ratio)) %>%
+  datatable(
+    rownames = FALSE,
+    colnames = c('Enrollee ID','CMHSP','Hours of treatment','Hours of observation','Ratio of observation to treatment'),
+    caption = 'Individuals without required observation for ABA treatment',
+    extensions = c('Responsive','Buttons'),
+    options = list(
+      dom = 't',
+      buttons = c('colvis')
+    )
   )
 
 ```
