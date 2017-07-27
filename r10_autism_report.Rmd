@@ -22,7 +22,7 @@ knitr::opts_chunk$set(echo=TRUE, message=FALSE, warning=FALSE)
 
 # Load required packages
 library(tidyverse); library(stringr); library(magrittr); library(lubridate); library(readxl)
-library(DT); library(forcats); library(plotly)
+library(DT); library(forcats); library(plotly); library(sparkline)
 ```
 
 # Reading in Data
@@ -267,7 +267,8 @@ waitlist_svs <-
     hrs = sum(hrs, na.rm = T),
     first = min(FROM_DATE),
     last = max(FROM_DATE)
-  )
+  ) 
+
 ```
 
 ## Summary of Services per Enrollee
@@ -439,7 +440,7 @@ aba_per %>%
 
 # Required Observation of ABA Services
 
-According to the Autism Waiver requirements, for every 10 hours of treatment provided (*including codes from the following:* `0364T`:`0367T`,`0372T`:`0374T`,`H2019`) to an individual client, there should be 1 hour of observation by a licensed practitioner(*including codes from the following:* `S5108`,`0368T`,`0369T`).  The table below shows the percentage of active autism waiver clients at each CMHSP who have received at least the required ratio of treatment to observation (10:1) during the most recent 90 days of available service data.  Individuals with fewer than 10 hours of treatment during this period are omitted from the calculations.
+According to the Autism Waiver requirements, for every 10 hours of treatment provided (*including codes from the following:* `0364T`:`0367T`,`0372T`:`0374T`,`H2019`) to an individual client, there should be 1 hour of observation by a licensed practitioner(*including codes from the following:* `S5108`,`0368T`,`0369T`).  The table below shows the percentage of active autism waiver clients at each CMHSP who have received at least the required ratio of treatment to observation (10:1) during the most recent 90 days of available service data.  Individuals with fewer than 10 hours of treatment during this period are omitted from the calculations.  If an individual has not been receiving services for 90 days, the calculation applies to the portion of the interval when they have received services.
 
 ```{r}
 # Note: uses filters defined above for service codes and clients included
