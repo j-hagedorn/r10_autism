@@ -280,7 +280,7 @@ The table below shows a summary of services received by each enrollee in the wai
 - *Days receiving services:*  The number of days between the earliest occurrence of any service following the person's eligibility date and the latest occurrence of any service
 - *Percent days covered:* The percentage of the days that the person has been on the waitlist that are overlapped by the provision of services (i.e. `Days receiving services`/`Days on waitlist`)
 - *Approximate hours:* The total number of hours of services received of any service that can be converted to a standard hour measurement.  This does not include units with the unit type of `Encounter` unless the time amount is specified in the service name.  It therefore *under*estimates the actual amount of services.
-
+- *Contains waiver services:*  This field indicates whether, despite being marked as on the waiting list in WSA, the individual has claims which were submitted as autism waiver services.  If the row is colored red, this indicates that the status recorded in the WSA may require an update.
 
 ```{r}
 waitlist_person <-
@@ -291,29 +291,36 @@ waitlist_person <-
     last = max(last),
     Eligibility_Date = as.Date(max(Eligibility_Date)),
     svs_list = paste(SERVICE_DESC, collapse = ', '),
-    encounters = sum(encounters)
+    encounters = sum(encounters),
+    autism_waiver_svs = sum(AUTISM_SRV, na.rm = T)
   ) %>%
   mutate(
     # Most recent date in services data pulled
     max_date = max(svs$FROM_DATE),
     elig_interval = as.numeric(max_date - Eligibility_Date),
     svs_interval = as.numeric(last - first),
-    pct_days_svd = round(svs_interval/elig_interval * 100, digits = 1)
+    pct_days_svd = round(svs_interval/elig_interval * 100, digits = 1),
+    autism_waiver_svs = autism_waiver_svs > 0
   )
 
 waitlist_person %>%
-  select(Case_ID,svs_list,elig_interval,svs_interval,pct_days_svd,encounters) %>%
+  select(Case_ID,svs_list,elig_interval,svs_interval,pct_days_svd,encounters,autism_waiver_svs) %>%
   ungroup() %>%
   arrange(pct_days_svd) %>%
   datatable(
     rownames = FALSE,
-    colnames = c('Enrollee ID','Services provided','Days on waitlist','Days receiving services','Percent days covered','Number of encounters'),
+    colnames = c('Enrollee ID','Services provided','Days on waitlist','Days receiving services','Percent days covered','Number of encounters','Contains waiver services'),
     caption = 'Service coverage for individuals on Autism Waiver waitlist, by Enrollee',
     extensions = c('Responsive','Buttons'),
     options = list(
       dom = 't',
       buttons = c('colvis')
     )
+  ) %>%
+  formatStyle(
+    'autism_waiver_svs',
+    color = styleEqual(c(0,1), c('white','red')),
+    backgroundColor = styleEqual(c(0,1), c('white','red'))
   )
 
 ```
