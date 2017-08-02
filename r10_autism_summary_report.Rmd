@@ -25,15 +25,6 @@ library(tidyverse); library(stringr); library(magrittr); library(lubridate); lib
 library(DT); library(forcats); library(plotly); library(sparkline)
 ```
 
-# Reading in Data
-
-The data for these analyses is drawn from two primary sources: 
-
-- *Service data* from the region's MIX EMR system and 
-- *Waiver enrollment* reports generated from the MDHHS WSA system.
-
-First, we read in the services data and process it for analysis.  Note that we are currently reading from .csv file output for this draft analysis.  A repeatable, automated process will rely on connection to database tables updated via an extract-transfer-load (ETL) process.
-
 ```{r}
 # Read in .csv files as dataframes
 csv_path <- "C:/Users/joshh/OneDrive - TBD Solutions LLC/files/Region10/Autism/"
@@ -102,8 +93,6 @@ svs %>%
     .funs = funs(. == "Y")
   ) 
 ```
-
-Next, we read in the waiver enrollment data and process it:
 
 ```{r}
 # Read in .csv files as dataframes
