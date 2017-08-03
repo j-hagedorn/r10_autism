@@ -35,18 +35,10 @@ The data for these analyses is drawn from two primary sources:
 First, we read in the services data and process it for analysis.  Note that we are currently reading from .csv file output for this draft analysis.  A repeatable, automated process will rely on connection to database tables updated via an extract-transfer-load (ETL) process.
 
 ```{r}
+
 # Read in .csv files as dataframes
 csv_path <- "C:/Users/joshh/OneDrive - TBD Solutions LLC/files/Region10/Autism/"
-genesee <- read_csv(paste0(csv_path,"Autism.Genesse.csv"), skip = 7)
-lapeer <- read_csv(paste0(csv_path,"Autism.Lapeer.csv"), skip = 7)
-sanilac <- read_csv(paste0(csv_path,"Autism.Sanilac.csv"), skip = 7)
-stclair <- read_csv(paste0(csv_path,"Autism.StClair.csv"), skip = 7)
-
-# Bind separate CMH dataframes together
-svs <- genesee %>% bind_rows(lapeer,sanilac,stclair)
-
-# Remove separate files from environment
-rm(csv_path); rm(genesee); rm(lapeer); rm(sanilac); rm(stclair)
+svs <- read_csv(paste0(csv_path,"svs.csv"))
 
 # Remove cols where all values are NA
 svs <- Filter(function(x)!all(is.na(x)), svs)
@@ -107,12 +99,7 @@ Next, we read in the waiver enrollment data and process it:
 
 ```{r}
 # Read in .csv files as dataframes
-csv_path <- "C:/Users/joshh/OneDrive - TBD Solutions LLC/files/Region10/Autism/"
-wsa <- read_excel(paste0(csv_path,"WSA All Cases All Data 05-30-17.xls"), skip = 1)
-
-# Clean colnames (rm spaces, other symbols, add underscore sep)
-names(wsa) <- gsub(" |-|/", "_", names(wsa))
-names(wsa) <- gsub("[[:space:]]", "", names(wsa))
+wsa <- read_csv(paste0(csv_path,"wsa.csv"))
 
 wsa %<>%
   mutate(
@@ -140,7 +127,7 @@ wsa %<>%
 
 # Read in data related to authorized units
 
-wsa_ipos <- read_excel(paste0(csv_path,"06-08-17 WSA IPOS Data Report.xls"), skip = 1)
+wsa_ipos <- read_csv(paste0(csv_path,"wsa_ipos.csv"))
 
 # Clean colnames (rm spaces, other symbols, add underscore sep)
 names(wsa_ipos) <- gsub(" |-|/", "_", names(wsa_ipos))
