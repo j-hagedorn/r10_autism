@@ -12,144 +12,21 @@ knitr::opts_chunk$set(echo=TRUE, message=FALSE, warning=FALSE)
 **Please note that this is currently a draft report under development with analysts at Region 10 PIHP**
 
 ```{r}
-# Install packages if you need them
-# if (!require("tidyverse")) install.packages("tidyverse")
-# if (!require("stringr")) install.packages("stringr")
-# if (!require("magrittr")) install.packages("magrittr")
-# if (!require("lubridate")) install.packages("lubridate")
-# if (!require("plotly")) install.packages("plotly")
-# if (!require("readxl")) install.packages("readxl")
-
 # Load required packages
 library(tidyverse); library(stringr); library(magrittr); library(lubridate); library(readxl)
-library(DT); library(forcats); library(plotly); library(sparkline)
+library(DT); library(forcats); library(plotly); library(sparkline);library(feather)
 ```
 
 ```{r}
 # Read in .csv files as dataframes
 csv_path <- "C:/Users/joshh/OneDrive - TBD Solutions LLC/files/Region10/Autism/"
-genesee <- read_csv(paste0(csv_path,"Autism.Genesse.csv"), skip = 7)
-lapeer <- read_csv(paste0(csv_path,"Autism.Lapeer.csv"), skip = 7)
-sanilac <- read_csv(paste0(csv_path,"Autism.Sanilac.csv"), skip = 7)
-stclair <- read_csv(paste0(csv_path,"Autism.StClair.csv"), skip = 7)
-
-# Bind separate CMH dataframes together
-svs <- genesee %>% bind_rows(lapeer,sanilac,stclair)
-
-# Remove separate files from environment
-rm(csv_path); rm(genesee); rm(lapeer); rm(sanilac); rm(stclair)
-
-# Remove cols where all values are NA
-svs <- Filter(function(x)!all(is.na(x)), svs)
-
-# Clean colnames (rm spaces, other symbols, add underscore sep)
-names(svs) <- gsub(":", "", names(svs))
-names(svs) <- gsub(" |-", "_", names(svs))
-
-# Clean data to prepare for analysis
-svs <-
-svs %>%
-  # Clean Medicaid ID field
-  mutate(
-    # Trim lead / trail whitespace
-    MEDICAID_ID = str_trim(MEDICAID_ID),
-    # Remove alpha and special chars
-    MEDICAID_ID = str_replace_all(MEDICAID_ID, "[[:alpha:]]", ""),
-    MEDICAID_ID = str_replace_all(MEDICAID_ID, "[[:punct:]]", ""),
-    # Convert blanks to NA
-    MEDICAID_ID = ifelse(MEDICAID_ID == "", yes = NA, no = MEDICAID_ID), 
-    # If string > 10 chars, include only last 10 chars
-    MEDICAID_ID = ifelse(nchar(as.character(MEDICAID_ID)) > 10,
-                      yes = substr(MEDICAID_ID, 
-                                   start = nchar(as.character(MEDICAID_ID)) - 9, 
-                                   stop = nchar(as.character(MEDICAID_ID))),
-                      no = MEDICAID_ID),
-    # If string < 10 chars, pad with leading zeroes
-    MEDICAID_ID = ifelse(nchar(as.character(MEDICAID_ID)) < 10,
-                      yes = sprintf("%010d", as.integer(MEDICAID_ID)),
-                      no = MEDICAID_ID),
-    # Make 'NA' & 0000000000 to NA
-    MEDICAID_ID = ifelse(MEDICAID_ID %in% c("        NA","NA","0000000000"), 
-                      yes = NA,
-                      no = MEDICAID_ID),
-    # Convert to factor
-    MEDICAID_ID = as.factor(MEDICAID_ID)
-  ) %>%
-  # Change numeric ID vars to characters
-  mutate_at(
-    .cols = vars(PRV_ID,CON_ID,CLM_ID:PRIM_INS_ID),
-    .funs = funs(as.character)
-  ) %>%
-  # Change all character columns to factors
-  mutate_if(is.character,as.factor) %>%
-  # Clean date fields to prepare for analysis
-  mutate(
-    FROM_DATE = mdy(FROM_DATE),
-    THRU_DATE = mdy(THRU_DATE)
-  ) %>%
-  # Transform Y/N responses into logical vars
-  mutate_at(
-    .cols = vars(HAB_WAIVER:HMP_BUCKET),
-    .funs = funs(. == "Y")
-  ) 
-```
-
-```{r}
+svs <- read_feather(paste0(csv_path,"svs.feather"))
 # Read in .csv files as dataframes
-csv_path <- "C:/Users/joshh/OneDrive - TBD Solutions LLC/files/Region10/Autism/"
-wsa <- read_excel(paste0(csv_path,"WSA All Cases All Data 05-30-17.xls"), skip = 1)
-
-# Clean colnames (rm spaces, other symbols, add underscore sep)
-names(wsa) <- gsub(" |-|/", "_", names(wsa))
-names(wsa) <- gsub("[[:space:]]", "", names(wsa))
-
-wsa %<>%
-  mutate(
-    Case_ID = as.character(Case_ID)
-  ) %>%
-  mutate_at(
-    .cols = vars(Days_Bet_Ref_Eval,Days_Bet_Elig_IPOS),
-    .funs = funs(as.numeric)
-  ) %>%
-  # Change all character columns to factors
-  mutate_if(is.character,as.factor) %>%
-  # Transform Y/N responses into logical vars
-  mutate_at(
-    .cols = vars(
-      IPOSExists,
-      Telepractice_Authorization_Requested,
-      Currently_Inactive,
-      Has_Past_Inactive
-    ),
-    .funs = funs(. == "Yes")
-  )
-  
-# If closed and opened, client is given a new 'Case ID' 
-# but Medicaid ID (i.e. 'ID') should be the same
+wsa <- read_feather(paste0(csv_path,"wsa.feather"))
+# If re-opened, client is given new 'Case ID' but Medicaid ID (i.e. 'ID') should be same
 
 # Read in data related to authorized units
-
-wsa_ipos <- read_excel(paste0(csv_path,"06-08-17 WSA IPOS Data Report.xls"), skip = 1)
-
-# Clean colnames (rm spaces, other symbols, add underscore sep)
-names(wsa_ipos) <- gsub(" |-|/", "_", names(wsa_ipos))
-names(wsa_ipos) <- gsub("[[:space:]]", "", names(wsa_ipos))
-
-wsa_ipos %<>%
-  mutate(
-    Case_ID = as.character(Case_ID)
-  ) %>%
-  mutate_at(
-    .cols = vars(Days_Without_IPOS,Next_IPOS_Due_In,ABA_Hours),
-    .funs = funs(as.numeric)
-  ) %>%
-  # Change all character columns to factors
-  mutate_if(is.character,as.factor) %>%
-  # Transform Y/N responses into logical vars
-  mutate_at(
-    .cols = vars(IPOS_Exists),
-    .funs = funs(. == "Yes")
-  )
+wsa_ipos <- read_feather(paste0(csv_path,"wsa_ipos.feather"))
 ```
 
 ---
@@ -396,19 +273,6 @@ aba_per %>%
 
 
 ```
-
-```{r}
-aba_per %>% 
-  filter(in_range == F) %>% 
-  select(-in_range) %>%
-  arrange(desc(pct)) %>%
-  datatable(
-    rownames = FALSE,
-    colnames = c('Enrollee ID','Hours of service','Prescribed Hours','Percent of prescribed hrs'),
-    caption = 'Autism waiver enrollees receiving services outside of prescribed range'
-  )
-```
-
 
 # Required Observation of ABA Services
 

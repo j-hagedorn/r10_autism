@@ -11,7 +11,7 @@ params:
 knitr::opts_chunk$set(echo=TRUE, message=FALSE, warning=FALSE)
 ```
 
-### This report was generated for `r paste0(params$cmh_wsa)` on `r Sys.Date()`
+### This report was generated for `r paste0(params$cmh)` on `r Sys.Date()`
 
 **Please note that this is currently a draft report under development with analysts at Region 10 PIHP**
 
@@ -20,7 +20,7 @@ knitr::opts_chunk$set(echo=TRUE, message=FALSE, warning=FALSE)
 
 # Load required packages
 library(tidyverse); library(stringr); library(magrittr); library(lubridate); library(readxl)
-library(DT); library(forcats); library(plotly); library(sparkline)
+library(DT); library(forcats); library(plotly); library(sparkline); library(feather)
 ```
 
 # Reading in Data
@@ -36,119 +36,23 @@ First, we read in the services data and process it for analysis.  Note that we a
 
 # Read in .csv files as dataframes
 csv_path <- "C:/Users/joshh/OneDrive - TBD Solutions LLC/files/Region10/Autism/"
-svs <- read_csv(paste0(csv_path,"svs.csv"))
+svs <- read_feather(paste0(csv_path,"svs.feather"))
 
-# Remove cols where all values are NA
-svs <- Filter(function(x)!all(is.na(x)), svs)
-
-# Clean colnames (rm spaces, other symbols, add underscore sep)
-names(svs) <- gsub(":", "", names(svs))
-names(svs) <- gsub(" |-", "_", names(svs))
-
-# Clean data to prepare for analysis
-svs <-
-svs %>%
-  # Filter to limit to CMHSP
-  filter(
-    PROVIDER_NAME == params$cmh
-  ) %>%
-  # Clean Medicaid ID field
-  mutate(
-    # Trim lead / trail whitespace
-    MEDICAID_ID = str_trim(MEDICAID_ID),
-    # Remove alpha and special chars
-    MEDICAID_ID = str_replace_all(MEDICAID_ID, "[[:alpha:]]", ""),
-    MEDICAID_ID = str_replace_all(MEDICAID_ID, "[[:punct:]]", ""),
-    # Convert blanks to NA
-    MEDICAID_ID = ifelse(MEDICAID_ID == "", yes = NA, no = MEDICAID_ID), 
-    # If string > 10 chars, include only last 10 chars
-    MEDICAID_ID = ifelse(nchar(as.character(MEDICAID_ID)) > 10,
-                      yes = substr(MEDICAID_ID, 
-                                   start = nchar(as.character(MEDICAID_ID)) - 9, 
-                                   stop = nchar(as.character(MEDICAID_ID))),
-                      no = MEDICAID_ID),
-    # If string < 10 chars, pad with leading zeroes
-    MEDICAID_ID = ifelse(nchar(as.character(MEDICAID_ID)) < 10,
-                      yes = sprintf("%010d", as.integer(MEDICAID_ID)),
-                      no = MEDICAID_ID),
-    # Make 'NA' & 0000000000 to NA
-    MEDICAID_ID = ifelse(MEDICAID_ID %in% c("        NA","NA","0000000000"), 
-                      yes = NA,
-                      no = MEDICAID_ID),
-    # Convert to factor
-    MEDICAID_ID = as.factor(MEDICAID_ID)
-  ) %>%
-  # Change numeric ID vars to characters
-  mutate_at(
-    .cols = vars(PRV_ID,CON_ID,CLM_ID:PRIM_INS_ID),
-    .funs = funs(as.character)
-  ) %>%
-  # Change all character columns to factors
-  mutate_if(is.character,as.factor) %>%
-  # Clean date fields to prepare for analysis
-  mutate(
-    FROM_DATE = mdy(FROM_DATE),
-    THRU_DATE = mdy(THRU_DATE)
-  ) %>%
-  # Transform Y/N responses into logical vars
-  mutate_at(
-    .cols = vars(HAB_WAIVER:HMP_BUCKET),
-    .funs = funs(. == "Y")
-  ) 
+# Filter df by defined paramater (i.e.. CMH name)
+svs %<>% filter(PROVIDER_NAME == params$cmh) %>% droplevels()
 ```
 
 Next, we read in the waiver enrollment data and process it:
 
 ```{r}
-wsa <- read_csv(paste0(csv_path,"wsa.csv"))
+# Read in .csv files as dataframes
+wsa <- read_feather(paste0(csv_path,"wsa.feather"))
+wsa %<>% filter(PIHP_CMH_Name == params$cmh) %>% droplevels()
+# If re-opened, client is given new 'Case ID' but Medicaid ID (i.e. 'ID') should be same
 
-wsa %<>%
-  filter(
-    PIHP_CMH_Name == params$cmh
-  ) %>%
-  mutate(
-    Case_ID = as.character(Case_ID)
-  ) %>%
-  mutate_at(
-    .cols = vars(Days_Bet_Ref_Eval,Days_Bet_Elig_IPOS),
-    .funs = funs(as.numeric)
-  ) %>%
-  # Change all character columns to factors
-  mutate_if(is.character,as.factor) %>%
-  # Transform Y/N responses into logical vars
-  mutate_at(
-    .cols = vars(
-      IPOSExists,
-      Telepractice_Authorization_Requested,
-      Currently_Inactive,
-      Has_Past_Inactive
-    ),
-    .funs = funs(. == "Yes")
-  )
-  
-# If closed and opened, client is given a new 'Case ID' 
-# but Medicaid ID (i.e. 'ID') should be the same
-
-wsa_ipos <- read_csv(paste0(csv_path,"wsa_ipos.csv"))
-
-wsa_ipos %<>%
-  filter(
-    PIHP_CHM == params$cmh
-  ) %>%
-  mutate(
-    Case_ID = as.character(Case_ID)
-  ) %>%
-  mutate_at(
-    .cols = vars(Days_Without_IPOS,Next_IPOS_Due_In,ABA_Hours),
-    .funs = funs(as.numeric)
-  ) %>%
-  # Change all character columns to factors
-  mutate_if(is.character,as.factor) %>%
-  # Transform Y/N responses into logical vars
-  mutate_at(
-    .cols = vars(IPOS_Exists),
-    .funs = funs(. == "Yes")
-  )
+# Read in data related to authorized units
+wsa_ipos <- read_feather(paste0(csv_path,"wsa_ipos.feather"))
+wsa_ipos %<>% filter(PIHP_CHM == params$cmh) %>% droplevels()
 ```
 
 ---
