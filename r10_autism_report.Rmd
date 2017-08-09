@@ -469,6 +469,11 @@ svs %>%
     meets_req = obs_ratio >= 0.1 & obs_ratio <= 1.0
   ) 
 
+
+```
+
+```{r}
+
 observe_agg <-
 observe %>%
   group_by(PROVIDER_NAME) %>%
@@ -503,15 +508,14 @@ For a detailed view of the individuals who have not received the appropriate lev
 
 ```{r}
 
-
 observe %>%
-  filter(meets_req == F) %>%
+  filter(meets_req == FALSE) %>%
   select(-meets_req) %>%
   arrange(desc(obs_ratio)) %>%
   datatable(
     rownames = FALSE,
-    colnames = c('Enrollee ID','CMHSP','Hours of treatment','Hours of observation','Ratio of observation to treatment'),
-    caption = 'Individuals without required observation for ABA treatment',
+    colnames = c('WSA ID','CMHSP','Treatment Hours','Observation Hours','Observation Ratio'),
+    caption = 'Autism waiver enrollees not receiving required observation',
     extensions = c('Responsive','Buttons'),
     options = list(
       dom = 't',
