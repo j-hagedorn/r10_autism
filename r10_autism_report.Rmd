@@ -197,7 +197,8 @@ waitlist_person %>%
     caption = 'Service coverage for individuals on Autism Waiver waitlist, by Enrollee',
     extensions = c('Responsive','Buttons'),
     options = list(
-      dom = 't',
+      pageLength = 15,
+      lengthMenu = c(15, 25,100),
       buttons = c('colvis')
     )
   ) %>%
@@ -256,6 +257,74 @@ svs %>%
     week = floor_date(FROM_DATE, unit = "week")
   ) %>%
   select(PROVIDER_NAME,MEDICAID_ID,CPT_CD:FROM_DATE,week,UNITS,hrs) 
+
+aba_summary <-
+  aba_svs %>%
+  # Get prescribed ABA hours from WSA IPOS
+  left_join(aba_rx_hrs, by = "MEDICAID_ID") %>%
+  # Get IPOS start date from WSA
+  left_join(ipos_start, by = "MEDICAID_ID") %>%
+  # Only include services if they occur after the IPOS Start Date
+  filter(FROM_DATE >= IPOS_Start_Date) %>%
+  # Only include services if they are in most recent 90 days of dataset
+  filter(FROM_DATE >= last_90) %>%
+  group_by(Case_ID,PROVIDER_NAME,week) %>%
+  summarize(
+    hrs = sum(hrs, na.rm = T),
+    ABA_Hours = max(ABA_Hours)
+  ) %>%
+  mutate(
+    # Calculate difference between actual and prescribed hours
+    # Negative values indicate hours less than goal
+    diff = hrs - ABA_Hours,
+    # Calculate % of prescribed hours received
+    # Tag Compliant and Non-Compliant weeks
+   
+    pct_all = round(sum(hrs) / sum(ABA_Hours) * 100, digits = 1),
+    in_range_all = ifelse(between(pct_all,75,125),T,F))%>%
+  ungroup() %>%
+  group_by(Case_ID,PROVIDER_NAME) %>%
+  summarise(
+    hrs = sum(hrs, na.rm = T),
+    ABA_Hours = sum(ABA_Hours, na.rm = T)
+  )%>%
+  mutate(
+    pct = round(hrs / ABA_Hours * 100, digits = 1),
+    in_range = ifelse(between(pct,75,125),T,F))%>%
+  group_by(PROVIDER_NAME)%>%
+  summarise(
+    numerator=sum(in_range),
+    denominator=n()
+  ) %>%
+  mutate(
+    pct=round(numerator/denominator*100,digits=1)
+  )
+
+aba_summary %>% 
+  datatable(
+    rownames = FALSE,
+    colnames = c('CMHSP','Enrollees within prescribed range','All Enrollees','Percent meeting standard'),
+    caption = 'Percentage of Autism waiver enrollees receiving prescribed ABA hours, by CMHSP for the last 90 days',
+    extensions = c('Responsive','Buttons'),
+    options = list(
+      dom = 't',
+      buttons = c('colvis')
+    )
+  ) %>%
+  formatStyle(
+    'pct',
+    backgroundSize = '100% 90%',
+    background = styleColorBar(aba_summary$pct, 'grey'),
+    backgroundRepeat = 'no-repeat',
+    backgroundPosition = 'center'
+  )
+
+
+
+```
+
+
+```{r}
 
 aba_week <-
   aba_svs %>%

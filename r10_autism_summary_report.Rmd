@@ -217,7 +217,7 @@ svs %>%
   ) %>%
   select(PROVIDER_NAME,MEDICAID_ID,CPT_CD:FROM_DATE,week,UNITS,hrs) 
 
-aba_week <-
+aba_summary <-
   aba_svs %>%
   # Get prescribed ABA hours from WSA IPOS
   left_join(aba_rx_hrs, by = "MEDICAID_ID") %>%
@@ -227,50 +227,56 @@ aba_week <-
   filter(FROM_DATE >= IPOS_Start_Date) %>%
   # Only include services if they are in most recent 90 days of dataset
   filter(FROM_DATE >= last_90) %>%
-  group_by(Case_ID,week) %>%
+  group_by(Case_ID,PROVIDER_NAME,week) %>%
   summarize(
     hrs = sum(hrs, na.rm = T),
-    ABA_Hours = max(ABA_Hours, na.rm = T)
+    ABA_Hours = max(ABA_Hours)
   ) %>%
   mutate(
     # Calculate difference between actual and prescribed hours
     # Negative values indicate hours less than goal
     diff = hrs - ABA_Hours,
     # Calculate % of prescribed hours received
-    pct = round(hrs / ABA_Hours * 100, digits = 1),
     # Tag Compliant and Non-Compliant weeks
-    in_range_wk = ifelse(between(pct,75,125),T,F)
-  ) %>%
-  ungroup() %>%
-  group_by(Case_ID) %>%
-  mutate(
+   
     pct_all = round(sum(hrs) / sum(ABA_Hours) * 100, digits = 1),
-    in_range_all = ifelse(between(pct_all,75,125),T,F)
-  ) 
-
-aba_per <-
-  aba_week %>%
-  group_by(Case_ID) %>%
-  summarize(
+    in_range_all = ifelse(between(pct_all,75,125),T,F))%>%
+  ungroup() %>%
+  group_by(Case_ID,PROVIDER_NAME) %>%
+  summarise(
     hrs = sum(hrs, na.rm = T),
-    rx_hrs = sum(ABA_Hours, na.rm = T)
+    ABA_Hours = sum(ABA_Hours, na.rm = T)
+  )%>%
+  mutate(
+    pct = round(hrs / ABA_Hours * 100, digits = 1),
+    in_range = ifelse(between(pct,75,125),T,F))%>%
+  group_by(PROVIDER_NAME)%>%
+  summarise(
+    numerator=sum(in_range),
+    denominator=n()
   ) %>%
   mutate(
-    pct = round(hrs / rx_hrs * 100, digits = 1),
-    in_range = ifelse(between(pct,75,125),T,F)
+    pct=round(numerator/denominator*100,digits=1)
   )
 
-aba_per %>%
-  mutate(
-    Case_ID = fct_reorder(Case_ID,desc(pct)),
-    in_range = ifelse(in_range == T,"Within range","Out of range")
+aba_summary %>% 
+  datatable(
+    rownames = FALSE,
+    colnames = c('CMHSP','Enrollees within prescribed range','All Enrollees','Percent meeting standard'),
+    caption = 'Percentage of Autism waiver enrollees receiving prescribed ABA hours, by CMHSP for the last 90 days',
+    extensions = c('Responsive','Buttons'),
+    options = list(
+      dom = 't',
+      buttons = c('colvis')
+    )
   ) %>%
-  plot_ly(x = ~Case_ID, y = ~pct, color = ~in_range, colors = c("#b0145b","#088da5")) %>%
-  layout(
-    title = "Percent of prescribed hours of ABA services received in last 90 days",
-    xaxis = list(title = "Autism Waiver Enrollee",zeroline = F,showline = F,showticklabels = F,showgrid = F), 
-    yaxis = list(title = "% of prescribed hours received"))
-
+  formatStyle(
+    'pct',
+    backgroundSize = '100% 90%',
+    background = styleColorBar(aba_summary$pct, 'grey'),
+    backgroundRepeat = 'no-repeat',
+    backgroundPosition = 'center'
+  )
 
 ```
 

@@ -206,7 +206,8 @@ waitlist_person %>%
     caption = 'Service coverage for individuals on Autism Waiver waitlist, by Enrollee',
     extensions = c('Responsive','Buttons'),
     options = list(
-      dom = 't',
+      pageLength = 15,
+      lengthMenu = c(15,25,100),
       buttons = c('colvis')
     )
   ) %>%
