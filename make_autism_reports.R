@@ -175,7 +175,6 @@ library(tidyverse); library(magrittr); library(stringr);library(lubridate);libra
   )
   
   # Render reports per CMH
-  rmarkdown::render("r10_autism_report_by_cmh.Rmd")
   
   for(cmh_name in unique(svs$PROVIDER_NAME)) {
     rmarkdown::render(
