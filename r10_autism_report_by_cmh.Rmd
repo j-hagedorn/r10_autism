@@ -88,7 +88,7 @@ wsa_tbl %>%
   ) %>%
   formatStyle(
     'pct',
-    background = styleColorBar(wsa_tbl$pct, 'grey'),
+    background = styleColorBar(c(0,100), 'grey'),
     backgroundSize = '100% 90%',
     backgroundRepeat = 'no-repeat',
     backgroundPosition = 'center'
@@ -431,7 +431,7 @@ observe_agg %>%
   ) %>%
   formatStyle(
     'pct',
-    background = styleColorBar(observe_agg$pct, 'grey'),
+    background = styleColorBar(c(0,100), 'grey'),
     backgroundSize = '100% 90%',
     backgroundRepeat = 'no-repeat',
     backgroundPosition = 'center'

@@ -1,15 +1,12 @@
 ---
 title: "Autism Waiver Compliance: Summary Report"
 output: 
-  html_document:
-    code_folding: hide
+  html_document
 ---
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo=TRUE, message=FALSE, warning=FALSE)
 ```
-
-**Please note that this is currently a draft report under development with analysts at Region 10 PIHP**
 
 ```{r}
 # Load required packages
@@ -28,6 +25,10 @@ wsa <- read_feather(paste0(csv_path,"wsa.feather"))
 # Read in data related to authorized units
 wsa_ipos <- read_feather(paste0(csv_path,"wsa_ipos.feather"))
 ```
+
+**Please note that this is currently a draft report under development with analysts at Region 10 PIHP**
+
+### This report was generated for Region 10 PIHP on `r max(svs$FROM_DATE)`
 
 ---
 
@@ -61,7 +62,7 @@ wsa_tbl %>%
   ) %>%
   formatStyle(
     'pct',
-    background = styleColorBar(wsa_tbl$pct, 'grey'),
+    background = styleColorBar(c(0,100), 'grey'),
     backgroundSize = '100% 90%',
     backgroundRepeat = 'no-repeat',
     backgroundPosition = 'center'
@@ -160,10 +161,15 @@ waitlist_person <-
   )
 
 waitlist_person %>%
-  plot_ly(x = ~pct_days_svd) %>%
+  plot_ly(
+    x = ~pct_days_svd,
+    hoverinfo = 'y+text',
+    text = ~paste0("% of waitlisted individuals received services<br>",
+                   "around this much of the time they were on the waitlist")
+  ) %>%
   layout(
     xaxis = list(title = "% of eligible days receiving services"), 
-    yaxis = list(title = "# of individuals on waitlist"), 
+    yaxis = list(title = "# of waitlisted individuals"), 
     showlegend = FALSE
   )
 
@@ -273,7 +279,7 @@ aba_summary %>%
   formatStyle(
     'pct',
     backgroundSize = '100% 90%',
-    background = styleColorBar(aba_summary$pct, 'grey'),
+    background = styleColorBar(c(0,100), 'grey'),
     backgroundRepeat = 'no-repeat',
     backgroundPosition = 'center'
   )
@@ -372,7 +378,7 @@ observe_agg %>%
   ) %>%
   formatStyle(
     'pct',
-    background = styleColorBar(observe_agg$pct, 'grey'),
+    background = styleColorBar(c(0,100), 'grey'),
     backgroundSize = '100% 90%',
     backgroundRepeat = 'no-repeat',
     backgroundPosition = 'center'

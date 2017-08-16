@@ -1,6 +1,6 @@
 # make_autism_reports.R
 
-library(tidyverse); library(magrittr); library(stringr);library(lubridate);library(feather)
+library(tidyverse); library(magrittr); library(stringr);library(lubridate);library(feather);library(readxl)
 
 # Read in data ####
 
@@ -164,13 +164,13 @@ library(tidyverse); library(magrittr); library(stringr);library(lubridate);libra
   # Render summary report for high-level review
   rmarkdown::render(
     input = "r10_autism_summary_report.Rmd",
-    output_file = paste0("r10_autism_summary_",Sys.Date(),".html"),
+    output_file = paste0("r10_autism_summary_",max(svs$FROM_DATE),".html"),
     output_dir = "reports"
   )
   # Render combined detail report for PIHP
   rmarkdown::render(
     input = "r10_autism_report.Rmd",
-    output_file = paste0("r10_autism_report_",Sys.Date(),".html"),
+    output_file = paste0("r10_autism_report_",max(svs$FROM_DATE),".html"),
     output_dir = "reports"
   )
   
@@ -179,7 +179,7 @@ library(tidyverse); library(magrittr); library(stringr);library(lubridate);libra
   for(cmh_name in unique(svs$PROVIDER_NAME)) {
     rmarkdown::render(
       input = "r10_autism_report_by_cmh.Rmd", 
-      output_file = paste0("r10_autism_summary_",cmh_name,"_",Sys.Date(),".html"),
+      output_file = paste0("r10_autism_summary_",cmh_name,"_",max(svs$FROM_DATE),".html"),
       output_dir = "reports/by_cmh",
       params = list(cmh = cmh_name)
     )

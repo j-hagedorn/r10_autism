@@ -9,8 +9,6 @@ output:
 knitr::opts_chunk$set(echo=TRUE, message=FALSE, warning=FALSE)
 ```
 
-**Please note that this is currently a draft report under development with analysts at Region 10 PIHP**
-
 ```{r}
 # Install packages if you need them
 # if (!require("tidyverse")) install.packages("tidyverse")
@@ -25,15 +23,6 @@ library(tidyverse); library(stringr); library(magrittr); library(lubridate); lib
 library(DT); library(forcats); library(plotly); library(sparkline);library(feather)
 ```
 
-# Reading in Data
-
-The data for these analyses is drawn from two primary sources: 
-
-- *Service data* from the region's MIX EMR system and 
-- *Waiver enrollment* reports generated from the MDHHS WSA system.
-
-First, we read in the services data and process it for analysis.  Note that we are currently reading from .csv file output for this draft analysis.  A repeatable, automated process will rely on connection to database tables updated via an extract-transfer-load (ETL) process.  We also read in the waiver enrollment data from WSA.
-
 ```{r}
 # Read in .csv files as dataframes
 csv_path <- "C:/Users/joshh/OneDrive - TBD Solutions LLC/files/Region10/Autism/"
@@ -46,6 +35,23 @@ wsa <- read_feather(paste0(csv_path,"wsa.feather"))
 wsa_ipos <- read_feather(paste0(csv_path,"wsa_ipos.feather"))
 
 ```
+
+### This report was generated for Region 10 PIHP on `r max(svs$FROM_DATE)`
+
+**Please note that this is currently a draft report under development with analysts at Region 10 PIHP**
+
+
+
+# Reading in Data
+
+The data for these analyses is drawn from two primary sources: 
+
+- *Service data* from the region's MIX EMR system and 
+- *Waiver enrollment* reports generated from the MDHHS WSA system.  Specifically, it uses the output from the WSA *"All Cases All Data"* report and the *"IPOS Data Report"*.
+
+First, we read in the services data and process it for analysis.  Note that we are currently reading from .csv file output for this draft analysis.  A repeatable, automated process will rely on connection to database tables updated via an extract-transfer-load (ETL) process.  We also read in the waiver enrollment data from WSA.
+
+
 
 ---
 
@@ -79,7 +85,7 @@ wsa_tbl %>%
   ) %>%
   formatStyle(
     'pct',
-    background = styleColorBar(wsa_tbl$pct, 'grey'),
+    background = styleColorBar(c(0,100), 'grey'),
     backgroundSize = '100% 90%',
     backgroundRepeat = 'no-repeat',
     backgroundPosition = 'center'
@@ -163,7 +169,7 @@ The table below shows a summary of services received by each enrollee in the wai
 - *Days on waitlist:* The number of days between the enrollee's eligibility date and the most recent service date included in the services data extract (for any enrollee)
 - *Days receiving services:*  The number of days between the earliest occurrence of any service following the person's eligibility date and the latest occurrence of any service
 - *Percent days covered:* The percentage of the days that the person has been on the waitlist that are overlapped by the provision of services (i.e. `Days receiving services`/`Days on waitlist`)
-- *Approximate hours:* The total number of hours of services received of any service that can be converted to a standard hour measurement.  This does not include units with the unit type of `Encounter` unless the time amount is specified in the service name.  It therefore *under*estimates the actual amount of services.
+- *Number of encounters:* The total count of service encounters received.  This is 
 - *Contains waiver services:*  This field indicates whether, despite being marked as on the waiting list in WSA, the individual has claims which were submitted as autism waiver services.  If the row is colored red, this indicates that the status recorded in the WSA may require an update.
 
 ```{r}
@@ -314,7 +320,7 @@ aba_summary %>%
   formatStyle(
     'pct',
     backgroundSize = '100% 90%',
-    background = styleColorBar(aba_summary$pct, 'grey'),
+    background = styleColorBar(c(0,100), 'grey'),
     backgroundRepeat = 'no-repeat',
     backgroundPosition = 'center'
   )
@@ -496,7 +502,7 @@ observe_agg %>%
   ) %>%
   formatStyle(
     'pct',
-    background = styleColorBar(observe_agg$pct, 'grey'),
+    background = styleColorBar(data = c(0,100), color = 'grey'),
     backgroundSize = '100% 90%',
     backgroundRepeat = 'no-repeat',
     backgroundPosition = 'center'
@@ -518,7 +524,8 @@ observe %>%
     caption = 'Autism waiver enrollees not receiving required observation',
     extensions = c('Responsive','Buttons'),
     options = list(
-      dom = 't',
+      pageLength = 10,
+      lengthMenu = c(10, 25,100),
       buttons = c('colvis')
     )
   )
