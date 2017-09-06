@@ -1,6 +1,11 @@
 
 ## test_spark.R
 
+#csv_path <- "C:/Users/joshh/OneDrive - TBD Solutions LLC/files/Region10/Autism/"
+svs <- read_feather("data/svs.feather")
+# Read in .csv files as dataframes
+wsa <- read_feather("data/wsa.feather")
+
 df <-
   wsa %>%
   # Filter individuals who are on waitlist
@@ -20,7 +25,6 @@ df <-
   mutate(
     week = floor_date(FROM_DATE, unit = "week")
   ) %>%
-<<<<<<< HEAD
   group_by(Case_ID,month) %>%
   summarize(Encounters = n()) %>%
   ungroup()
@@ -263,3 +267,7 @@ formatStyle(
 )
 dt$dependencies <- append(dt$dependencies, htmlwidgets:::getDependency("sparkline"))
 dt
+##############################################################################################################
+##############################################################################################################
+##############################################################################################################
+
