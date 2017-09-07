@@ -199,7 +199,7 @@ t2 <-
 
 r <- range(t2$Encounters) # define min/max # of encounters for sparkline
 
-t3 <- merge(x = t2, y = t1, by = "Case_ID", all.x = TRUE)
+t3 <- merge(x = t1, y = t2, by = "Case_ID", all.x = TRUE)
 
 
 # Define attributes of line spark
@@ -208,8 +208,8 @@ line_string <- "type: 'line', lineColor: 'black', fillColor: '#ccc', highlightLi
 box_string <- "type: 'box', lineColor: 'black', whiskerColor: 'black', outlierFillColor: 'black', outlierLineColor: 'black', medianColor: 'black', boxFillColor: 'orange', boxLineColor: 'black'"
 
 #line chart and boxplot
-cd <- list(list(targets = 1, render = JS("function(data, type, full){ return '<span class=sparkSeries>' + data + '</span>' }")),
-           list(targets = 2, render = JS("function(data, type, full){ return '<span class=sparkSamples>' + data + '</span>' }")))
+cd <- list(list(targets = 7, render = JS("function(data, type, full){ return '<span class=sparkSeries>' + data + '</span>' }")),
+           list(targets = 8, render = JS("function(data, type, full){ return '<span class=sparkSamples>' + data + '</span>' }")))
 
 cb = JS(paste0("function (oSettings, json) {
                \n  $('.sparkSeries:not(:has(canvas))').sparkline('html', { ", line_string, " });
@@ -227,24 +227,6 @@ cb = JS(paste0("function (oSettings, json) {
 #                \n}")
 #         , collapse = "")
 
-=======
-sparkline(tst$trend[91])
-
-waitlist_person %>%
-  select(Case_ID,svs_list,elig_interval,svs_interval,pct_days_svd,encounters) %>%
-  ungroup() %>%
-  arrange(pct_days_svd) %>%
-  datatable(
-    rownames = FALSE,
-    colnames = c('Enrollee ID','Services provided','Days on waitlist','Days receiving services','Percent days covered','Number of encounters'),
-    caption = 'Service coverage for individuals on Autism Waiver waitlist, by Enrollee',
-    extensions = c('Responsive','Buttons'),
-    options = list(
-      dom = 't',
-      buttons = c('colvis')
-    )
-  )
->>>>>>> parent of f1c50c9... Sparklines
 
 dt <- t3 %>%
   datatable(

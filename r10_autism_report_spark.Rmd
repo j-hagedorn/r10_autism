@@ -40,8 +40,10 @@ First, we read in the services data and process it for analysis.  Note that we a
 # Read in .csv files as dataframes
 #csv_path <- "C:/Users/joshh/OneDrive - TBD Solutions LLC/files/Region10/Autism/"
 svs <- read_feather("data/svs.feather")
+svs$MEDICAID_ID <- as.character(svs$MEDICAID_ID)
 # Read in .csv files as dataframes
 wsa <- read_feather("data/wsa.feather")
+wsa$ID <- as.character(wsa$ID)
 # If re-opened, client is given new 'Case ID' but Medicaid ID (i.e. 'ID') should be same
 
 # Read in data related to authorized units
@@ -223,7 +225,7 @@ t2 <- wsa %>%
 
 r <- range(t2$Encounters) # define min/max # of encounters for sparkline
 
-t3 <- merge(x = t1, y = t2, by = "Case_ID", all.x = TRUE) # join t1 ad t2
+t3 <- merge(x = t2, y = t1, by = "Case_ID", all.x = TRUE) # join t1 ad t2
 
 
 # Define attributes of line spark
@@ -231,8 +233,8 @@ line_string <- "type: 'line', lineColor: 'black', fillColor: '#ccc', highlightLi
 
 box_string <- "type: 'box', lineColor: 'black', whiskerColor: 'black', outlierFillColor: 'black', outlierLineColor: 'black', medianColor: 'black', boxFillColor: 'orange', boxLineColor: 'black'"
 
-cd <- list(list(targets = 7, render = JS("function(data, type, full){ return '<span class=sparkSeries>' + data + '</span>' }")),
-           list(targets = 8, render = JS("function(data, type, full){ return '<span class=sparkSamples>' + data + '</span>' }")))
+cd <- list(list(targets = 1, render = JS("function(data, type, full){ return '<span class=sparkSeries>' + data + '</span>' }")),
+           list(targets = 2, render = JS("function(data, type, full){ return '<span class=sparkSamples>' + data + '</span>' }")))
 
 cb = JS(paste0("function (oSettings, json) {\n  $('.sparkSeries:not(:has(canvas))').sparkline('html', { ",
                line_string, " });\n  $('.sparkSamples:not(:has(canvas))').sparkline('html', { ",
@@ -242,21 +244,21 @@ dt <- t3 %>%
   datatable(
     data.table(),
     rownames = FALSE,
-    colnames = c('Enrollee ID','Services provided','Days on waitlist','Days receiving services',
-                 'Percent days covered','Total Number of encounters','Contains waiver services',
-                 'Encounters by month','Encounters by month'),
+    colnames = c('Enrollee ID','Encounters by Month','Encounters by Month','Services provided',
+                 'Days on waitlist','Days receiving services','Percent days covered',
+                 'Total Number of encounters','Contains waiver services'),
     caption = 'Service coverage for individuals on Autism Waiver waitlist, by Enrollee',
     extensions = c('Responsive','Buttons'),
     options = list(
       columnDefs = cd,
       fnDrawCallback = cb,
       dom = 't',
-      buttons = c('colvis'))) %>%
-  formatStyle(
-  'autism_waiver_svs',
-  color = styleEqual(c(0,1), c('white','red')),
-  backgroundColor = styleEqual(c(0,1), c('white','red'))
-)
+      buttons = c('colvis')))
+#   formatStyle(
+#   'autism_waiver_svs',
+#   color = styleEqual(c(0,1), c('white','red')),
+#   backgroundColor = styleEqual(c(0,1), c('white','red'))
+# )
 dt$dependencies <- append(dt$dependencies, htmlwidgets:::getDependency("sparkline"))
 dt
 
