@@ -244,16 +244,20 @@ dt <- t3 %>%
   datatable(
     data.table(),
     rownames = FALSE,
-    colnames = c('Enrollee ID','Encounters by Month','Encounters by Month','Services provided',
+    colnames = c('Enrollee ID','Consistency of Encounters',
+                 'Variation of Monthly Encounters','Services provided',
                  'Days on waitlist','Days receiving services','Percent days covered',
                  'Total Number of encounters','Contains waiver services'),
     caption = 'Service coverage for individuals on Autism Waiver waitlist, by Enrollee',
     extensions = c('Responsive','Buttons'),
     options = list(
       columnDefs = cd,
+      pageLength = 5,
+      lengthMenu = c(5, 15, 25, 50),
       fnDrawCallback = cb,
       dom = 't',
-      buttons = c('colvis')))
+      buttons = c('colvis'))
+    )
 #   formatStyle(
 #   'autism_waiver_svs',
 #   color = styleEqual(c(0,1), c('white','red')),
