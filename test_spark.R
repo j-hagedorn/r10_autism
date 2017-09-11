@@ -79,7 +79,6 @@ d1 <- datatable(tst, rownames = F, options = list(columnDefs = cd, fnDrawCallbac
 d1$dependencies <- append(d1$dependencies, htmlwidgets:::getDependency("sparkline"))
 d1
 
-<<<<<<< HEAD
 ##############################################################################################################
 ##############################################################################################################
 ##############################################################################################################
@@ -193,13 +192,13 @@ t2 <-
   ungroup() %>%
   group_by(Case_ID) %>%
   summarise(
-    Encounters = paste(Encounters, collapse = ","),
-    Encounters2 = paste(Encounters, collapse = ",")) # remove this is boxplot not needed
+    Encounters = paste(Encounters, collapse = ","))
+#    Encounters2 = paste(Encounters, collapse = ",")) # remove this if boxplot not needed
   
 
 r <- range(t2$Encounters) # define min/max # of encounters for sparkline
 
-t3 <- merge(x = t1, y = t2, by = "Case_ID", all.x = TRUE)
+t3 <- merge(x = t2, y = t1, by = "Case_ID", all.x = TRUE)
 
 
 # Define attributes of line spark
@@ -208,45 +207,47 @@ line_string <- "type: 'line', lineColor: 'black', fillColor: '#ccc', highlightLi
 box_string <- "type: 'box', lineColor: 'black', whiskerColor: 'black', outlierFillColor: 'black', outlierLineColor: 'black', medianColor: 'black', boxFillColor: 'orange', boxLineColor: 'black'"
 
 #line chart and boxplot
-cd <- list(list(targets = 7, render = JS("function(data, type, full){ return '<span class=sparkSeries>' + data + '</span>' }")),
-           list(targets = 8, render = JS("function(data, type, full){ return '<span class=sparkSamples>' + data + '</span>' }")))
-
-cb = JS(paste0("function (oSettings, json) {
-               \n  $('.sparkSeries:not(:has(canvas))').sparkline('html', { ", line_string, " });
-               \n  $('.sparkSamples:not(:has(canvas))').sparkline('html', { ", box_string, " });
-               \n}")
-        , collapse = "")
-
-
-
-# line chart only
-# cd <- list(list(targets = 7, render = JS("function(data, type, full){ return '<span class=sparkSeries>' + data + '</span>' }")))
+# cd <- list(list(targets = 7, render = JS("function(data, type, full){ return '<span class=sparkSeries>' + data + '</span>' }")),
+#            list(targets = 8, render = JS("function(data, type, full){ return '<span class=sparkSamples>' + data + '</span>' }")))
 # 
 # cb = JS(paste0("function (oSettings, json) {
 #                \n  $('.sparkSeries:not(:has(canvas))').sparkline('html', { ", line_string, " });
+#                \n  $('.sparkSamples:not(:has(canvas))').sparkline('html', { ", box_string, " });
 #                \n}")
 #         , collapse = "")
 
 
+
+# line chart only
+cd <- list(list(targets = 1, render = JS("function(data, type, full){ return '<span class=sparkSeries>' + data + '</span>' }")))
+
+cb = JS(paste0("function (oSettings, json) {
+               \n  $('.sparkSeries:not(:has(canvas))').sparkline('html', { ", line_string, " });
+               \n}")
+        , collapse = "")
+
+
 dt <- t3 %>%
   datatable(
-    data.table(),
+    # data.table(),
     rownames = FALSE,
-    colnames = c('Enrollee ID','Services provided','Days on waitlist','Days receiving services',
-                 'Percent days covered','Total Number of encounters','Contains waiver services',
-                 'Encounters by month','Encounters by Month'),
+    colnames = c('Enrollee ID','Encounters by Month','Services provided','Days on waitlist',
+                 'Days receiving services','Percent days covered','Total Number of encounters',
+                 'Contains waiver services'),
     caption = 'Service coverage for individuals on Autism Waiver waitlist, by Enrollee',
     extensions = c('Responsive','Buttons'),
     options = list(
       columnDefs = cd,
       fnDrawCallback = cb,
-      dom = 't',
-      buttons = c('colvis'))) %>%
-formatStyle(
-  'autism_waiver_svs',
-  color = styleEqual(c(0,1), c('white','red')),
-  backgroundColor = styleEqual(c(0,1), c('white','red'))
-)
+      pageLength = 5,
+      lengthMenu = c(5, 15, 25, 50),
+      # dom = 't',
+      buttons = c('colvis')))
+# formatStyle(
+#   'autism_waiver_svs',
+#   color = styleEqual(c(0,1), c('white','red')),
+#   backgroundColor = styleEqual(c(0,1), c('white','red'))
+# )
 dt$dependencies <- append(dt$dependencies, htmlwidgets:::getDependency("sparkline"))
 dt
 ##############################################################################################################

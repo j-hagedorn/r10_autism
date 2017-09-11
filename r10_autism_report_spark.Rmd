@@ -220,8 +220,7 @@ t2 <- wsa %>%
   ungroup() %>%
   group_by(Case_ID) %>%
   summarise(
-    Encounters = paste(Encounters, collapse = ","),
-    Encounters2 = paste(Encounters, collapse = ","))
+    Encounters = paste(Encounters, collapse = ","))
 
 r <- range(t2$Encounters) # define min/max # of encounters for sparkline
 
@@ -231,21 +230,19 @@ t3 <- merge(x = t2, y = t1, by = "Case_ID", all.x = TRUE) # join t1 ad t2
 # Define attributes of line spark
 line_string <- "type: 'line', lineColor: 'black', fillColor: '#ccc', highlightLineColor: 'orange', highlightSpotColor: 'orange'"
 
-box_string <- "type: 'box', lineColor: 'black', whiskerColor: 'black', outlierFillColor: 'black', outlierLineColor: 'black', medianColor: 'black', boxFillColor: 'orange', boxLineColor: 'black'"
+cd <- list(list(targets = 1, render = JS("function(data, type, full){ return '<span class=sparkSeries>' + data + '</span>' }")))
 
-cd <- list(list(targets = 1, render = JS("function(data, type, full){ return '<span class=sparkSeries>' + data + '</span>' }")),
-           list(targets = 2, render = JS("function(data, type, full){ return '<span class=sparkSamples>' + data + '</span>' }")))
-
-cb = JS(paste0("function (oSettings, json) {\n  $('.sparkSeries:not(:has(canvas))').sparkline('html', { ",
-               line_string, " });\n  $('.sparkSamples:not(:has(canvas))').sparkline('html', { ",
-               box_string, " });\n}"), collapse = "")
+cb = JS(paste0("function (oSettings, json) {
+               \n  $('.sparkSeries:not(:has(canvas))').sparkline('html', { ", line_string, " });
+               \n}")
+        , collapse = "")
 
 dt <- t3 %>%
   datatable(
     data.table(),
     rownames = FALSE,
     colnames = c('Enrollee ID','Consistency of Encounters',
-                 'Variation of Monthly Encounters','Services provided',
+                 'Services provided',
                  'Days on waitlist','Days receiving services','Percent days covered',
                  'Total Number of encounters','Contains waiver services'),
     caption = 'Service coverage for individuals on Autism Waiver waitlist, by Enrollee',
@@ -255,7 +252,7 @@ dt <- t3 %>%
       pageLength = 5,
       lengthMenu = c(5, 15, 25, 50),
       fnDrawCallback = cb,
-      dom = 't',
+      # dom = 't',
       buttons = c('colvis'))
     )
 #   formatStyle(
