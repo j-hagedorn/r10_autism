@@ -164,7 +164,7 @@ waitlist_person %>%
   plot_ly(
     x = ~pct_days_svd,
     hoverinfo = 'y+text',
-    text = ~paste0("% of waitlisted individuals received services<br>",
+    text = ~paste0("# of waitlisted individuals received services<br>",
                    "around this much of the time they were on the waitlist")
   ) %>%
   layout(
