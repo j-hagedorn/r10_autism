@@ -83,6 +83,8 @@ The following analyses will ask different questions for the groups represented h
 
 For each individual who is autism waiver eligible and on the waitlist, what percent of the days that the person has been on the waitlist are overlapped by the provision of non-ABA services (i.e. `Days receiving services`/`Days on waitlist`)?
 
+*Please note that the data in this report may not reflect the services of all enrollees that participated in the Autism Waiver Program.  Specifically, enrollee services may not show in the data for more recent periods where claims were not yet submitted.*
+
 ```{r}
 waitlist_svs <-
   wsa %>%
