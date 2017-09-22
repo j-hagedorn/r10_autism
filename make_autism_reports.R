@@ -81,7 +81,7 @@ library(tidyverse); library(magrittr); library(stringr);library(lubridate);libra
   
   # Write to file
   # Note that this will overwrite any previous files with the same name
-  write_feather(svs,paste0(csv_path,"svs.feather"))
+  write_feather(svs,"data/svs.feather")
   
 # Read WSA 
   # Read wsa file
@@ -121,7 +121,7 @@ library(tidyverse); library(magrittr); library(stringr);library(lubridate);libra
       )
     )
   
-  write_feather(wsa,paste0(csv_path,"wsa.feather"))
+  write_feather(wsa,"data/wsa.feather")
   
   # Read in data related to authorized units
   wsa_ipos <- read_excel(paste0(csv_path,"06-08-17 WSA IPOS Data Report.xls"), skip = 1)
@@ -155,7 +155,7 @@ library(tidyverse); library(magrittr); library(stringr);library(lubridate);libra
       )
     )
   
-  write_feather(wsa_ipos,paste0(csv_path,"wsa_ipos.feather"))
+  write_feather(wsa_ipos,"data/wsa_ipos.feather")
 
 
 
