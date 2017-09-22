@@ -26,9 +26,9 @@ wsa <- read_feather(paste0(csv_path,"wsa.feather"))
 wsa_ipos <- read_feather(paste0(csv_path,"wsa_ipos.feather"))
 ```
 
-**Please note that this is currently a draft report under development with analysts at Region 10 PIHP**
-
 ### This report was generated for Region 10 PIHP on `r max(svs$FROM_DATE)`
+
+*Please note that the data in this report may not reflect the services of all enrollees that participated in the Autism Waiver Program.  Specifically, enrollee services may not show in the data for more recent periods where claims were not yet submitted.*
 
 ---
 
@@ -164,7 +164,7 @@ waitlist_person %>%
   plot_ly(
     x = ~pct_days_svd,
     hoverinfo = 'y+text',
-    text = ~paste0("% of waitlisted individuals received services<br>",
+    text = ~paste0("# of waitlisted individuals received services<br>",
                    "around this much of the time they were on the waitlist")
   ) %>%
   layout(
@@ -268,7 +268,7 @@ aba_summary <-
 aba_summary %>% 
   datatable(
     rownames = FALSE,
-    colnames = c('CMHSP','Enrollees within prescribed range','All Enrollees','Percent meeting standard'),
+    colnames = c('CMHSP','Enrollees within prescribed range','Enrollees receiving ABA Services','Percent meeting standard'),
     caption = 'Percentage of Autism waiver enrollees receiving prescribed ABA hours, by CMHSP for the last 90 days',
     extensions = c('Responsive','Buttons'),
     options = list(
@@ -348,13 +348,14 @@ svs %>%
   group_by(Case_ID,PROVIDER_NAME,type) %>%
   summarize(hrs = sum(hrs)) %>%
   ungroup() %>%
+  mutate(hrs = ifelse(is.na(hrs),0,hrs)) %>%
   spread(type, hrs) %>%
-  # Exclude cases with < 10 hours of treatment
-  filter(Treatment >= 10) %>%
   mutate(
     obs_ratio = round(Observation / Treatment, digits = 2),
     meets_req = obs_ratio >= 0.1 & obs_ratio <= 1.0
-  ) 
+  ) %>%
+  # Exclude cases with < 10 hours of treatment if they don't meet criteria
+  filter(Treatment >= 10 | (Treatment < 10 & meets_req == T))
 
 observe_agg <-
 observe %>%

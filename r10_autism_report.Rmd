@@ -1,13 +1,16 @@
 ---
 title: "Autism Service Compliance"
-output: 
+output:
   html_document:
     code_folding: hide
+  pdf_document: default
 ---
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo=TRUE, message=FALSE, warning=FALSE)
 ```
+
+**Please note that this is currently a draft report under development with analysts at Region 10 PIHP**
 
 ```{r}
 # Install packages if you need them
@@ -21,26 +24,8 @@ knitr::opts_chunk$set(echo=TRUE, message=FALSE, warning=FALSE)
 # Load required packages
 library(tidyverse); library(stringr); library(magrittr); library(lubridate); library(readxl)
 library(DT); library(forcats); library(plotly); library(sparkline);library(feather)
+library(data.table); library(reshape2); library(dplyr)
 ```
-
-```{r}
-# Read in .csv files as dataframes
-csv_path <- "C:/Users/joshh/OneDrive - TBD Solutions LLC/files/Region10/Autism/"
-svs <- read_feather(paste0(csv_path,"svs.feather"))
-# Read in .csv files as dataframes
-wsa <- read_feather(paste0(csv_path,"wsa.feather"))
-# If re-opened, client is given new 'Case ID' but Medicaid ID (i.e. 'ID') should be same
-
-# Read in data related to authorized units
-wsa_ipos <- read_feather(paste0(csv_path,"wsa_ipos.feather"))
-
-```
-
-### This report was generated for Region 10 PIHP on `r max(svs$FROM_DATE)`
-
-**Please note that this is currently a draft report under development with analysts at Region 10 PIHP**
-
-
 
 # Reading in Data
 
@@ -51,7 +36,23 @@ The data for these analyses is drawn from two primary sources:
 
 First, we read in the services data and process it for analysis.  Note that we are currently reading from .csv file output for this draft analysis.  A repeatable, automated process will rely on connection to database tables updated via an extract-transfer-load (ETL) process.  We also read in the waiver enrollment data from WSA.
 
+```{r}
+# Read in .csv files as dataframes
+svs <- read_feather("data/svs.feather")
+svs$MEDICAID_ID <- as.character(svs$MEDICAID_ID)
+# Read in .csv files as dataframes
+wsa <- read_feather("data/wsa.feather")
+wsa$ID <- as.character(wsa$ID)
+# If re-opened, client is given new 'Case ID' but Medicaid ID (i.e. 'ID') should be same
 
+# Read in data related to authorized units
+wsa_ipos <- read_feather("data/wsa_ipos.feather")
+
+```
+
+### This report was generated for Region 10 PIHP on `r max(svs$FROM_DATE)`
+
+*Please note that the data in this report may not reflect the services of all enrollees that participated in the Autism Waiver Program.  Specifically, enrollee services may not show in the data for more recent periods where claims were not yet submitted.*
 
 ---
 
@@ -85,7 +86,7 @@ wsa_tbl %>%
   ) %>%
   formatStyle(
     'pct',
-    background = styleColorBar(c(0,100), 'grey'),
+    background = styleColorBar(data = c(0,100), color = 'grey'),
     backgroundSize = '100% 90%',
     backgroundRepeat = 'no-repeat',
     backgroundPosition = 'center'
@@ -104,9 +105,17 @@ The following analyses will ask different questions for the groups represented h
 
 ## Services per Enrollee on Waitlist
 
-For each individual who is autism waiver eligible and on the waitlist, what non-ABA services are he/she receiving while they are waiting? At what frequency? 
+For each individual who is autism waiver eligible and on the waitlist, what non-ABA services are he/she receiving while they are waiting? At what frequency?  The table below shows a summary of services received by each enrollee in the waiver who has been placed on the waitlist.^[]  It includes the following information:
+
+- *Services provided:*  A list of services that the person has received
+- *Days on waitlist:* The number of days between the enrollee's eligibility date and the most recent service date included in the services data extract (for any enrollee)
+- *Days receiving services:*  The number of days between the earliest occurrence of any service following the person's eligibility date and the latest occurrence of any service
+- *Percent days covered:* The percentage of the days that the person has been on the waitlist that are overlapped by the provision of services (i.e. `Days receiving services`/`Days on waitlist`)
+- *Number of encounters:* The total count of service encounters received.  
+- *Contains waiver services:*  This field indicates whether, despite being marked as on the waiting list in WSA, the individual has claims which were submitted as autism waiver services.  If the row is colored red, this indicates that the status recorded in the WSA may require an update.
 
 ```{r}
+
 waitlist_svs <-
   wsa %>%
   # Filter individuals who are on waitlist
@@ -159,20 +168,6 @@ waitlist_svs <-
     last = max(FROM_DATE)
   ) 
 
-```
-
-## Summary of Services per Enrollee
-
-The table below shows a summary of services received by each enrollee in the waiver who has been placed on the waitlist.^[]  It includes the following information:
-
-- *Services provided:*  A list of services that the person has received
-- *Days on waitlist:* The number of days between the enrollee's eligibility date and the most recent service date included in the services data extract (for any enrollee)
-- *Days receiving services:*  The number of days between the earliest occurrence of any service following the person's eligibility date and the latest occurrence of any service
-- *Percent days covered:* The percentage of the days that the person has been on the waitlist that are overlapped by the provision of services (i.e. `Days receiving services`/`Days on waitlist`)
-- *Number of encounters:* The total count of service encounters received.  This is 
-- *Contains waiver services:*  This field indicates whether, despite being marked as on the waiting list in WSA, the individual has claims which were submitted as autism waiver services.  If the row is colored red, this indicates that the status recorded in the WSA may require an update.
-
-```{r}
 waitlist_person <-
   waitlist_svs %>%
   group_by(Case_ID) %>%
@@ -193,26 +188,73 @@ waitlist_person <-
     autism_waiver_svs = autism_waiver_svs > 0
   )
 
-waitlist_person %>%
+t1 <- waitlist_person %>%
   select(Case_ID,svs_list,elig_interval,svs_interval,pct_days_svd,encounters,autism_waiver_svs) %>%
   ungroup() %>%
-  arrange(pct_days_svd) %>%
+  arrange(pct_days_svd)
+
+t2 <- wsa %>%
+  # Filter individuals who are on waitlist
+  filter(
+    Status == "Open"
+    & IPOSExists == F
+    & is.na(Eligibility_Date) == F
+  ) %>%
+  select(ID,Case_ID,PIHP_CMH_Name,Referral_Date:Eligibility_End_Date) %>%
+  left_join(svs, by = c("ID" = "MEDICAID_ID")) %>%
+  filter(
+    # Only include services occurring after eligibility for autism
+    FROM_DATE >= as.Date(Eligibility_Date) 
+    # or if there is no service date (to keep people who didn't receive svs)
+    | is.na(FROM_DATE) == T 
+  ) %>%
+  mutate(
+    week = floor_date(FROM_DATE, unit = "week"),
+    month = floor_date(FROM_DATE, unit = "month")
+  ) %>%
+  group_by(Case_ID,month) %>%
+  summarize(Encounters = n()) %>%
+  ungroup() %>%
+  group_by(Case_ID) %>%
+  summarise(
+    Encounters = paste(Encounters, collapse = ","))
+
+r <- range(t2$Encounters) # define min/max # of encounters for sparkline
+
+t3 <- merge(x = t2, y = t1, by = "Case_ID", all.x = TRUE) # join t1 ad t2
+
+
+# Define attributes of line spark
+line_string <- "type: 'line', lineColor: 'black', fillColor: '#ccc', highlightLineColor: 'orange', highlightSpotColor: 'orange'"
+
+cd <- list(list(targets = 1, render = JS("function(data, type, full){ return '<span class=sparkSeries>' + data + '</span>' }")))
+
+cb = JS(paste0("function (oSettings, json) {
+               \n  $('.sparkSeries:not(:has(canvas))').sparkline('html', { ", line_string, " });
+               \n}")
+        , collapse = "")
+
+dt <- t3 %>%
   datatable(
+    data.table(),
     rownames = FALSE,
-    colnames = c('Enrollee ID','Services provided','Days on waitlist','Days receiving services','Percent days covered','Number of encounters','Contains waiver services'),
+    colnames = c('WSA ID','Consistency of Encounters',
+                 'Services provided',
+                 'Days on waitlist','Days receiving services','Percent days covered',
+                 'Total Number of encounters','Contains waiver services'),
     caption = 'Service coverage for individuals on Autism Waiver waitlist, by Enrollee',
     extensions = c('Responsive','Buttons'),
     options = list(
-      pageLength = 15,
-      lengthMenu = c(15, 25,100),
-      buttons = c('colvis')
+      columnDefs = cd,
+      pageLength = 5,
+      lengthMenu = c(5, 15, 25, 50),
+      fnDrawCallback = cb,
+      # dom = 't',
+      buttons = c('colvis'))
     )
-  ) %>%
-  formatStyle(
-    'autism_waiver_svs',
-    color = styleEqual(c(0,1), c('white','red')),
-    backgroundColor = styleEqual(c(0,1), c('white','red'))
-  )
+
+dt$dependencies <- append(dt$dependencies, htmlwidgets:::getDependency("sparkline"))
+dt
 
 ```
 
@@ -263,74 +305,6 @@ svs %>%
     week = floor_date(FROM_DATE, unit = "week")
   ) %>%
   select(PROVIDER_NAME,MEDICAID_ID,CPT_CD:FROM_DATE,week,UNITS,hrs) 
-
-aba_summary <-
-  aba_svs %>%
-  # Get prescribed ABA hours from WSA IPOS
-  left_join(aba_rx_hrs, by = "MEDICAID_ID") %>%
-  # Get IPOS start date from WSA
-  left_join(ipos_start, by = "MEDICAID_ID") %>%
-  # Only include services if they occur after the IPOS Start Date
-  filter(FROM_DATE >= IPOS_Start_Date) %>%
-  # Only include services if they are in most recent 90 days of dataset
-  filter(FROM_DATE >= last_90) %>%
-  group_by(Case_ID,PROVIDER_NAME,week) %>%
-  summarize(
-    hrs = sum(hrs, na.rm = T),
-    ABA_Hours = max(ABA_Hours)
-  ) %>%
-  mutate(
-    # Calculate difference between actual and prescribed hours
-    # Negative values indicate hours less than goal
-    diff = hrs - ABA_Hours,
-    # Calculate % of prescribed hours received
-    # Tag Compliant and Non-Compliant weeks
-   
-    pct_all = round(sum(hrs) / sum(ABA_Hours) * 100, digits = 1),
-    in_range_all = ifelse(between(pct_all,75,125),T,F))%>%
-  ungroup() %>%
-  group_by(Case_ID,PROVIDER_NAME) %>%
-  summarise(
-    hrs = sum(hrs, na.rm = T),
-    ABA_Hours = sum(ABA_Hours, na.rm = T)
-  )%>%
-  mutate(
-    pct = round(hrs / ABA_Hours * 100, digits = 1),
-    in_range = ifelse(between(pct,75,125),T,F))%>%
-  group_by(PROVIDER_NAME)%>%
-  summarise(
-    numerator=sum(in_range),
-    denominator=n()
-  ) %>%
-  mutate(
-    pct=round(numerator/denominator*100,digits=1)
-  )
-
-aba_summary %>% 
-  datatable(
-    rownames = FALSE,
-    colnames = c('CMHSP','Enrollees within prescribed range','All Enrollees','Percent meeting standard'),
-    caption = 'Percentage of Autism waiver enrollees receiving prescribed ABA hours, by CMHSP for the last 90 days',
-    extensions = c('Responsive','Buttons'),
-    options = list(
-      dom = 't',
-      buttons = c('colvis')
-    )
-  ) %>%
-  formatStyle(
-    'pct',
-    backgroundSize = '100% 90%',
-    background = styleColorBar(c(0,100), 'grey'),
-    backgroundRepeat = 'no-repeat',
-    backgroundPosition = 'center'
-  )
-
-
-
-```
-
-
-```{r}
 
 aba_week <-
   aba_svs %>%
@@ -399,7 +373,7 @@ aba_per %>%
   arrange(desc(pct)) %>%
   datatable(
     rownames = FALSE,
-    colnames = c('Enrollee ID','Hours of service','Prescribed Hours','Percent of prescribed hrs'),
+    colnames = c('WSA ID','Hours of service','Prescribed Hours','Percent of prescribed hrs'),
     caption = 'Autism waiver enrollees receiving services outside of prescribed range'
   )
 ```
@@ -467,18 +441,14 @@ svs %>%
   group_by(Case_ID,PROVIDER_NAME,type) %>%
   summarize(hrs = sum(hrs)) %>%
   ungroup() %>%
+  mutate(hrs = ifelse(is.na(hrs),0,hrs)) %>%
   spread(type, hrs) %>%
-  # Exclude cases with < 10 hours of treatment
-  filter(Treatment >= 10) %>%
   mutate(
     obs_ratio = round(Observation / Treatment, digits = 2),
     meets_req = obs_ratio >= 0.1 & obs_ratio <= 1.0
-  ) 
-
-
-```
-
-```{r}
+  ) %>%
+  # Exclude cases with < 10 hours of treatment if they don't meet criteria
+  filter(Treatment >= 10 | (Treatment < 10 & meets_req == T))
 
 observe_agg <-
 observe %>%
@@ -514,21 +484,23 @@ For a detailed view of the individuals who have not received the appropriate lev
 
 ```{r}
 
+
 observe %>%
-  filter(meets_req == FALSE) %>%
+  filter(meets_req == F) %>%
   select(-meets_req) %>%
   arrange(desc(obs_ratio)) %>%
   datatable(
     rownames = FALSE,
-    colnames = c('WSA ID','CMHSP','Treatment Hours','Observation Hours','Observation Ratio'),
-    caption = 'Autism waiver enrollees not receiving required observation',
+    colnames = c('WSA ID','CMHSP','Hours of treatment','Hours of observation','Ratio of observation to treatment'),
+    caption = 'Individuals without required observation for ABA treatment',
     extensions = c('Responsive','Buttons'),
     options = list(
       pageLength = 10,
-      lengthMenu = c(10, 25,100),
+      lengthMenu = c(10, 25, 50),
       buttons = c('colvis')
     )
   )
 
 ```
+
 
