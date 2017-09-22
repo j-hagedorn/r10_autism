@@ -26,9 +26,9 @@ wsa <- read_feather(paste0(csv_path,"wsa.feather"))
 wsa_ipos <- read_feather(paste0(csv_path,"wsa_ipos.feather"))
 ```
 
-**Please note that this is currently a draft report under development with analysts at Region 10 PIHP**
-
 ### This report was generated for Region 10 PIHP on `r max(svs$FROM_DATE)`
+
+*Please note that the data in this report may not reflect the services of all enrollees that participated in the Autism Waiver Program.  Specifically, enrollee services may not show in the data for more recent periods where claims were not yet submitted.*
 
 ---
 
@@ -82,8 +82,6 @@ The following analyses will ask different questions for the groups represented h
 ## Percent of Days Receiving Services per Waitlisted Enrollee
 
 For each individual who is autism waiver eligible and on the waitlist, what percent of the days that the person has been on the waitlist are overlapped by the provision of non-ABA services (i.e. `Days receiving services`/`Days on waitlist`)?
-
-*Please note that the data in this report may not reflect the services of all enrollees that participated in the Autism Waiver Program.  Specifically, enrollee services may not show in the data for more recent periods where claims were not yet submitted.*
 
 ```{r}
 waitlist_svs <-
