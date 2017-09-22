@@ -439,13 +439,14 @@ svs %>%
   group_by(Case_ID,PROVIDER_NAME,type) %>%
   summarize(hrs = sum(hrs)) %>%
   ungroup() %>%
+  mutate(hrs = ifelse(is.na(hrs),0,hrs)) %>%
   spread(type, hrs) %>%
-  # Exclude cases with < 10 hours of treatment
-  filter(Treatment >= 10) %>%
   mutate(
     obs_ratio = round(Observation / Treatment, digits = 2),
     meets_req = obs_ratio >= 0.1 & obs_ratio <= 1.0
-  ) 
+  ) %>%
+  # Exclude cases with < 10 hours of treatment if they don't meet criteria
+  filter(Treatment >= 10 | (Treatment < 10 & meets_req == T))
 
 observe_agg <-
 observe %>%
@@ -492,10 +493,12 @@ observe %>%
     caption = 'Individuals without required observation for ABA treatment',
     extensions = c('Responsive','Buttons'),
     options = list(
-      dom = 't',
+      pageLength = 10,
+      lengthMenu = c(10, 25, 50),
       buttons = c('colvis')
     )
   )
 
 ```
+
 
