@@ -268,7 +268,7 @@ aba_summary <-
 aba_summary %>% 
   datatable(
     rownames = FALSE,
-    colnames = c('CMHSP','Enrollees within prescribed range','All Enrollees','Percent meeting standard'),
+    colnames = c('CMHSP','Enrollees within prescribed range','Enrollees receiving ABA Services','Percent meeting standard'),
     caption = 'Percentage of Autism waiver enrollees receiving prescribed ABA hours, by CMHSP for the last 90 days',
     extensions = c('Responsive','Buttons'),
     options = list(

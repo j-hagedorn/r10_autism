@@ -50,6 +50,8 @@ wsa_ipos <- read_feather("data/wsa_ipos.feather")
 
 ```
 
+### This report was generated for Region 10 PIHP on `r max(svs$FROM_DATE)`
+
 *Please note that the data in this report may not reflect the services of all enrollees that participated in the Autism Waiver Program.  Specifically, enrollee services may not show in the data for more recent periods where claims were not yet submitted.*
 
 ---
