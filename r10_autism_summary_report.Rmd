@@ -288,7 +288,7 @@ aba_summary %>%
 
 # Required Observation of ABA Services
 
-According to the Autism Waiver requirements, for every 10 hours of treatment provided (*including codes from the following:* `0364T`:`0367T`,`0372T`:`0374T`,`H2019`) to an individual client, there should be 1 hour of observation by a licensed practitioner(*including codes from the following:* `S5108`,`0368T`,`0369T`).  The table below shows the percentage of active autism waiver clients at each CMHSP who have received at least the required ratio of treatment to observation (10:1) during the most recent 90 days of available service data.  Individuals with fewer than 10 hours of treatment during this period are omitted from the calculations.  If an individual has not been receiving services for 90 days, the calculation applies to the portion of the interval when they have received services.
+According to the Autism Waiver requirements, for every 10 hours of treatment provided (*including codes from the following:* `0364T`:`0367T`,`0372T`:`0374T`,`H2019`) to an individual client, there should be 1 hour of observation by a licensed practitioner(*including codes from the following:* `S5108`,`0368T`,`0369T`).  The table below shows the percentage of active autism waiver clients at each CMHSP who have received at least the required ratio of treatment to observation (10:1) during the most recent 90 days of available service data.  Individuals with fewer than 10 hours of treatment during this period are omitted from the calculations.  If an individual has not been receiving services for 90 days, the calculation applies to the portion of the interval when they have received services.  The target performance for this measure is that 100% of enrollees receiving ABA services will receive the required observation hours.
 
 ```{r}
 # Note: uses filters defined above for service codes and clients included
@@ -369,7 +369,7 @@ observe %>%
 observe_agg %>%  
   datatable(
     rownames = FALSE,
-    colnames = c('CMHSP','Enrollees with required observation','All Enrollees','Percent meeting standard'),
+    colnames = c('CMHSP','Enrollees with required observation','Enrollees receiving ABA Services','Percent meeting standard'),
     caption = 'Percentage of Autism waiver enrollees receiving required observation, by CMHSP',
     extensions = c('Responsive','Buttons'),
     options = list(
