@@ -1,14 +1,13 @@
 ---
 title: "Autism Service Compliance"
 output: 
-  html_document:
-    code_folding: hide
+  html_document
 params:
    cmh: "Genesee Health System"
 ---
 
 ```{r setup, include=FALSE}
-knitr::opts_chunk$set(echo=TRUE, message=FALSE, warning=FALSE)
+knitr::opts_chunk$set(echo=FALSE, message=FALSE, warning=FALSE)
 ```
 
 ### This report was generated for `r paste0(params$cmh)` on `r Sys.Date()`
