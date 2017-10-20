@@ -321,12 +321,32 @@ aba_week <-
   filter(FROM_DATE >= as.Date(IPOS_Start_Date)) %>%
   # Only include services if they are in most recent 90 days of dataset
   filter(FROM_DATE >= last_90) %>%
-  group_by(Case_ID,week) %>%
+  mutate(
+    type = recode(
+      CPT_CD,
+      `S5108` = "Observation",
+      `0368T` = "Observation",
+      `0369T` = "Observation",
+      `0364T` = "Treatment",
+      `0365T` = "Treatment",
+      `0366T` = "Treatment",
+      `0367T` = "Treatment",
+      `0372T` = "Treatment",
+      `0373T` = "Treatment",
+      `0374T` = "Treatment",
+      `H2019` = "Treatment"
+    )
+  ) %>%
+  group_by(Case_ID,week,type) %>%
   summarize(
     hrs = sum(hrs, na.rm = T),
     ABA_Hours = max(ABA_Hours, na.rm = T)
   ) %>%
+  ungroup() %>%
+  spread(type,hrs) %>%
   mutate(
+    # Recombine for total count
+    hrs = Treatment + Observation,
     # Calculate difference between actual and prescribed hours
     # Negative values indicate hours less than goal
     diff = hrs - ABA_Hours,
