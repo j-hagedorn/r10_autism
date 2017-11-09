@@ -16,7 +16,7 @@ library(DT); library(forcats); library(plotly); library(sparkline);library(feath
 
 ```{r}
 # Read in .csv files as dataframes
-csv_path <- "C:/Users/joshh/OneDrive - TBD Solutions LLC/files/Region10/Autism/"
+csv_path <- "S:/Region 10/Lisa Yang/r10_autism-master/"
 svs <- read_feather(paste0(csv_path,"svs.feather"))
 # Read in .csv files as dataframes
 wsa <- read_feather(paste0(csv_path,"wsa.feather"))
@@ -32,9 +32,7 @@ wsa_ipos <- read_feather(paste0(csv_path,"wsa_ipos.feather"))
 
 ---
 
-# Eligible Autism Waiver Enrollees without a Plan of Service
-
-As an initial summary, we look at the percent of persons who are enrolled in the autism waiver (i.e. `Status == "Open"`), but who do not have an Individualized Plan of Service (IPOS).
+# Enrollees without a Behavioral Plan of Service
 
 ```{r}
 wsa_tbl <-
@@ -52,7 +50,7 @@ wsa %>%
 wsa_tbl %>%
   datatable(
     rownames = FALSE,
-    colnames = c('CMHSP','Enrollees without IPOS','All Enrollees','Pct without IPOS'),
+    colnames = c('CMHSP','Waitlisted Enrollees','Enrollees','Pct of Waitlisted Enrollees'),
     caption = 'Percentage of Autism waiver enrollees without IPOS, by CMHSP',
     extensions = c('Responsive','Buttons'),
     options = list(
@@ -70,14 +68,9 @@ wsa_tbl %>%
   
 ```
 
-The following analyses will ask different questions for the groups represented here.  
-
-- **Waitlist:** For individuals who do not have an IPOS and are not receiving Autism Waiver services, we will ask whether they receive interim services during their time on the waitlist.  
-- **Receiving Services:** For individuals who are receiving autism waiver services, we will ask whether they are receiving services in the amount prescribed in their IPOS and whether their services are being conducted with the appropriate level of observation.
-
 ---
 
-# Interim Services for Persons on Autism Waitlist
+# Interim Services for Waitlisted enrollees
 
 ## Percent of Days Receiving Services per Waitlisted Enrollee
 
@@ -289,7 +282,7 @@ aba_summary %>%
 
 # Required Observation of ABA Services
 
-According to the Autism Waiver requirements, for every 10 hours of treatment provided (*including codes from the following:* `0364T`:`0367T`,`0372T`:`0374T`,`H2019`) to an individual client, there should be 1 hour of observation by a licensed practitioner(*including codes from the following:* `S5108`,`0368T`,`0369T`).  The table below shows the percentage of active autism waiver clients at each CMHSP who have received at least the required ratio of treatment to observation (10:1) during the most recent 90 days of available service data.  Individuals with fewer than 10 hours of treatment during this period are omitted from the calculations.  If an individual has not been receiving services for 90 days, the calculation applies to the portion of the interval when they have received services.  The target performance for this measure is that 100% of enrollees receiving ABA services will receive the required observation hours.
+
 
 ```{r}
 # Note: uses filters defined above for service codes and clients included
