@@ -1,9 +1,10 @@
 ---
 title: "Autism Service Compliance"
-output: 
-  html_document
 params:
-   cmh: "Genesee Health System"
+  cmh: Genesee Health System
+output:
+  pdf_document: default
+  html_document: default
 ---
 
 ```{r setup, include=FALSE}
@@ -25,15 +26,13 @@ library(data.table); library(reshape2); library(dplyr)
 
 The data for these analyses is drawn from two primary sources: 
 
-- *Service data* from the region's MIX EMR system and 
-- *Waiver enrollment* reports generated from the MDHHS WSA system.
 
 First, we read in the services data and process it for analysis.  Note that we are currently reading from .csv file output for this draft analysis.  A repeatable, automated process will rely on connection to database tables updated via an extract-transfer-load (ETL) process.
 
 ```{r}
 
 # Read in .csv files as dataframes
-csv_path <- "C:/Users/joshh/OneDrive - TBD Solutions LLC/files/Region10/Autism/"
+csv_path <- "S:/Region 10/Lisa Yang/r10_autism-master/"
 svs <- read_feather(paste0(csv_path,"svs.feather"))
 
 # Filter df by defined parameter (i.e.. CMH name)
@@ -57,9 +56,9 @@ wsa_ipos %<>% filter(PIHP_CHM == params$cmh) %>% droplevels()
 
 ---
 
-# Eligible Autism Waiver Enrollees without a Plan of Service
+# Enrollees without a Behavioral Plan of Service
 
-As an initial summary, we look at the percent of persons who are enrolled in the autism waiver (i.e. `Status == "Open"`), but who do not have an Individualized Plan of Service (IPOS).
+As an initial summary, we look at the percent of enrollees, but who do not have an Individualized Bahavioral Plan of Service (IPOS).
 
 ```{r}
 wsa_tbl <-
@@ -77,8 +76,8 @@ wsa %>%
 wsa_tbl %>%
   datatable(
     rownames = FALSE,
-    colnames = c('CMHSP','Enrollees without IPOS','All Enrollees','Pct without IPOS'),
-    caption = 'Percentage of Autism waiver enrollees without IPOS, by CMHSP',
+    colnames = c('Regional Total','Enrollees','Waitlisted Enrollees','Pct of Waitlisted Enrollees'),
+    caption = 'Percentage of enrollees without BPOS, by CMHSP',
     extensions = c('Responsive','Buttons'),
     options = list(
       dom = 't',
@@ -102,18 +101,12 @@ The following analyses will ask different questions for the groups represented h
 
 ---
 
-# Interim Services for Persons on Autism Waitlist
+# Non-ABA services for Waitlisted enrollees
 
-## Services per Enrollee on Waitlist
+## Services per Waitlisted Enrollees
 
-For each individual who is autism waiver eligible and on the waitlist, what non-ABA services are he/she receiving while they are waiting? At what frequency?  The table below shows a summary of services received by each enrollee in the waiver who has been placed on the waitlist.^[]  It includes the following information:
+For each waitlisted enrollee, what non-ABA services are he/she receiving while they are waiting? At what frequency?  The table below shows a summary of services received by each enrollee in the waiver who has been placed on the waitlist.^[]  It includes the following information:
 
-- *Services provided:*  A list of services that the person has received
-- *Days on waitlist:* The number of days between the enrollee's eligibility date and the most recent service date included in the services data extract (for any enrollee)
-- *Days receiving services:*  The number of days between the earliest occurrence of any service following the person's eligibility date and the latest occurrence of any service
-- *Percent days covered:* The percentage of the days that the person has been on the waitlist that are overlapped by the provision of services (i.e. `Days receiving services`/`Days on waitlist`)
-- *Number of encounters:* The total count of service encounters received.  
-- *Contains waiver services:*  This field indicates whether, despite being marked as on the waiting list in WSA, the individual has claims which were submitted as autism waiver services.  If the row is colored red, this indicates that the status recorded in the WSA may require an update.
 
 ```{r}
 
@@ -259,9 +252,9 @@ dt
 
 ```
 
-# Conformance with Prescribed Hours for ABA Services
+# Range of Intensity Compliance
 
-For individuals who are receiving autism waiver services, what is the amount of services and does it match their plan?  The bar chart below shows the percentage of authorized hours of ABA that have been provided for each active autism waiver enrollee over the past 90 days.  Individuals whose services fall outside of the acceptable range (*i.e. <75% or >125%*) of the prescribed hours are differentiated by color.
+Hours of treatment provided within 25% +/- of authorized hours. 
 
 ```{r}
 
@@ -359,13 +352,12 @@ aba_per %>%
   layout(
     title = "Percent of prescribed hours of ABA services received in last 90 days",
     xaxis = list(title = "Autism Waiver Enrollee",zeroline = F,showline = F,showticklabels = F,showgrid = F), 
-    yaxis = list(title = "% of prescribed hours received")
+    yaxis = list(title = "Hours of treatment")
   )
 
 
 ```
 
-The individuals whose ABA service hours are outside of the prescribed range are shown in the table below:
 
 ```{r}
 aba_per %>% 
@@ -375,14 +367,13 @@ aba_per %>%
   datatable(
     rownames = FALSE,
     colnames = c('WSA ID','Hours of service','Prescribed Hours','Percent of prescribed hrs'),
-    caption = 'Autism waiver enrollees receiving services outside of prescribed range'
+    caption = 'Enrollees with non-compliance in hours of treatment'
   )
 ```
 
 
-# Required Observation of ABA Services
+# Observation Compliance
 
-According to the Autism Waiver requirements, for every 10 hours of treatment provided (*including codes from the following:* `0364T`:`0367T`,`0372T`:`0374T`,`H2019`) to an individual client, there should be 1 hour of observation by a licensed practitioner(*including codes from the following:* `S5108`,`0368T`,`0369T`).  The table below shows the percentage of active autism waiver clients at each CMHSP who have received at least the required ratio of treatment to observation (10:1) during the most recent 90 days of available service data.  Individuals with fewer than 10 hours of treatment during this period are omitted from the calculations.  If an individual has not been receiving services for 90 days, the calculation applies to the portion of the interval when they have received services.
 
 ```{r}
 # Note: uses filters defined above for service codes and clients included
@@ -463,7 +454,7 @@ observe %>%
 observe_agg %>%  
   datatable(
     rownames = FALSE,
-    colnames = c('CMHSP','Enrollees with required observation','All Enrollees','Percent meeting standard'),
+    colnames = c('CMHSP','Enrollees with required observation','Enrollees','Percent meeting standard'),
     caption = 'Percentage of Autism waiver enrollees receiving required observation, by CMHSP',
     extensions = c('Responsive','Buttons'),
     options = list(
