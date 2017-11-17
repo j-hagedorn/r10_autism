@@ -26,7 +26,6 @@ library(data.table); library(reshape2); library(dplyr)
 
 The data for these analyses is drawn from two primary sources: 
 
-
 First, we read in the services data and process it for analysis.  Note that we are currently reading from .csv file output for this draft analysis.  A repeatable, automated process will rely on connection to database tables updated via an extract-transfer-load (ETL) process.
 
 ```{r}
@@ -285,6 +284,8 @@ svs %>%
     CPT_CD %in% aba_cpt
     & USED_MOD == "U5" # Only include U5 modifier for Autism services
   ) %>%
+  # Now remove observation codes
+  filter(!CPT_CD %in% c("S5108","0368T","0369T")) %>%
   droplevels() %>%
   mutate(
     # Recode unit type as numeric conversion factor

@@ -198,6 +198,8 @@ svs %>%
     CPT_CD %in% aba_cpt
     & USED_MOD == "U5" # Only include U5 modifier for Autism services
   ) %>%
+  # Now remove observation codes
+  filter(!CPT_CD %in% c("S5108","0368T","0369T")) %>%
   droplevels() %>%
   mutate(
     # Recode unit type as numeric conversion factor
