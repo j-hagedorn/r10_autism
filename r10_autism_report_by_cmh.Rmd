@@ -3,8 +3,8 @@ title: "Autism Service Compliance"
 params:
   cmh: Genesee Health System
 output:
-  pdf_document: default
   html_document: default
+  pdf_document: default
 ---
 
 ```{r setup, include=FALSE}
@@ -31,7 +31,7 @@ First, we read in the services data and process it for analysis.  Note that we a
 ```{r}
 
 # Read in .csv files as dataframes
-csv_path <- "S:/Region 10/Lisa Yang/r10_autism-master/"
+csv_path <- "data/"
 svs <- read_feather(paste0(csv_path,"svs.feather"))
 
 # Filter df by defined parameter (i.e.. CMH name)
@@ -315,32 +315,13 @@ aba_week <-
   filter(FROM_DATE >= as.Date(IPOS_Start_Date)) %>%
   # Only include services if they are in most recent 90 days of dataset
   filter(FROM_DATE >= last_90) %>%
-  mutate(
-    type = recode(
-      CPT_CD,
-      `S5108` = "Observation",
-      `0368T` = "Observation",
-      `0369T` = "Observation",
-      `0364T` = "Treatment",
-      `0365T` = "Treatment",
-      `0366T` = "Treatment",
-      `0367T` = "Treatment",
-      `0372T` = "Treatment",
-      `0373T` = "Treatment",
-      `0374T` = "Treatment",
-      `H2019` = "Treatment"
-    )
-  ) %>%
-  group_by(Case_ID,week,type) %>%
+  group_by(Case_ID,week) %>%
   summarize(
     hrs = sum(hrs, na.rm = T),
     ABA_Hours = max(ABA_Hours, na.rm = T)
   ) %>%
   ungroup() %>%
-  spread(type,hrs) %>%
   mutate(
-    # Recombine for total count
-    hrs = Treatment + Observation,
     # Calculate difference between actual and prescribed hours
     # Negative values indicate hours less than goal
     diff = hrs - ABA_Hours,

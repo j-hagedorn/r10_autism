@@ -15,8 +15,9 @@ library(DT); library(forcats); library(plotly); library(sparkline);library(feath
 ```
 
 ```{r}
+
 # Read in .csv files as dataframes
-csv_path <- "S:/Region 10/Lisa Yang/r10_autism-master/"
+csv_path <- "data/"
 svs <- read_feather(paste0(csv_path,"svs.feather"))
 # Read in .csv files as dataframes
 wsa <- read_feather(paste0(csv_path,"wsa.feather"))
@@ -24,6 +25,7 @@ wsa <- read_feather(paste0(csv_path,"wsa.feather"))
 
 # Read in data related to authorized units
 wsa_ipos <- read_feather(paste0(csv_path,"wsa_ipos.feather"))
+
 ```
 
 ### This report was generated for Region 10 PIHP on `r max(svs$FROM_DATE)`
@@ -48,6 +50,15 @@ wsa %>%
   ) 
 
 wsa_tbl %>%
+  # Add subtotal line for PIHP
+  rbind(
+    ., 
+    data.frame(
+      PIHP_CMH_Name = "Region 10", 
+      t(colSums(.[2:3])),
+      pct = round(colSums(.[2])/colSums(.[3])*100,digits = 1)
+    )
+  ) %>%
   datatable(
     rownames = FALSE,
     colnames = c('CMHSP','Waitlisted Enrollees','Enrollees','Pct of Waitlisted Enrollees'),
@@ -262,6 +273,15 @@ aba_summary <-
   )
 
 aba_summary %>% 
+  # Add subtotal line for PIHP
+  rbind(
+    ., 
+    data.frame(
+      PROVIDER_NAME = "Region 10", 
+      t(colSums(.[2:3])),
+      pct = round(colSums(.[2])/colSums(.[3])*100,digits = 1)
+    )
+  ) %>%
   datatable(
     rownames = FALSE,
     colnames = c('CMHSP','Enrollees within prescribed range','Enrollees receiving ABA Services','Percent meeting standard'),
@@ -363,6 +383,15 @@ observe %>%
   mutate(pct = round(meets_req / n * 100, digits = 1)) 
   
 observe_agg %>%  
+  # Add subtotal line for PIHP
+  rbind(
+    ., 
+    data.frame(
+      PROVIDER_NAME = "Region 10", 
+      t(colSums(.[2:3])),
+      pct = round(colSums(.[2])/colSums(.[3])*100,digits = 1)
+    )
+  ) %>%
   datatable(
     rownames = FALSE,
     colnames = c('CMHSP','Enrollees with required observation','Enrollees receiving ABA Services','Percent meeting standard'),

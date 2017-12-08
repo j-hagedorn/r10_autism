@@ -11,29 +11,14 @@ output:
 knitr::opts_chunk$set(echo=TRUE, message=FALSE, warning=FALSE)
 ```
 
-**Please note that this is currently a draft report under development with analysts at Region 10 PIHP**
-
-```{r}
-# Install packages if you need them
-# if (!require("tidyverse")) install.packages("tidyverse")
-# if (!require("stringr")) install.packages("stringr")
-# if (!require("magrittr")) install.packages("magrittr")
-# if (!require("lubridate")) install.packages("lubridate")
-# if (!require("plotly")) install.packages("plotly")
-# if (!require("readxl")) install.packages("readxl")
-
+```{r load_libs}
 # Load required packages
 library(tidyverse); library(stringr); library(magrittr); library(lubridate); library(readxl)
 library(DT); library(forcats); library(plotly); library(sparkline);library(feather)
 library(data.table); library(reshape2); library(dplyr)
 ```
 
-# Reading in Data
-
-
-First, we read in the services data and process it for analysis.  Note that we are currently reading from .csv file output for this draft analysis.  A repeatable, automated process will rely on connection to database tables updated via an extract-transfer-load (ETL) process.  We also read in the waiver enrollment data from WSA.
-
-```{r}
+```{r read_data}
 # Read in .csv files as dataframes
 svs <- read_feather("data/svs.feather")
 svs$MEDICAID_ID <- as.character(svs$MEDICAID_ID)
@@ -51,14 +36,15 @@ wsa_ipos <- read_feather("data/wsa_ipos.feather")
 
 *Please note that the data in this report may not reflect the services of all enrollees that participated in the Autism Waiver Program.  Specifically, enrollee services may not show in the data for more recent periods where claims were not yet submitted.*
 
+# Reading in Data
+
+First, we read in the services data and process it for analysis.  Note that we are currently reading from .csv file output for this draft analysis.  A repeatable, automated process will rely on connection to database tables updated via an extract-transfer-load (ETL) process.  We also read in the waiver enrollment data from WSA.
+
 ---
 
 # Enrollees without a Behavioral Plan of Service
 
-As an initial summary, we look at the percent of enrollees, but who do not have a Behavioral Plan of Service (BPOS).
-
-*Percentage of enrollees without BPOS, by CMHSP*
-
+As an initial summary, we look at the percent of enrollees who do not have a Behavioral Plan of Service (BPOS).
 
 ```{r}
 wsa_tbl <-
@@ -74,6 +60,15 @@ wsa %>%
   ) 
 
 wsa_tbl %>%
+  # Add subtotal line for PIHP
+  rbind(
+    ., 
+    data.frame(
+      PIHP_CMH_Name = "Region 10", 
+      t(colSums(.[2:3])),
+      pct = round(colSums(.[2])/colSums(.[3])*100,digits = 1)
+    )
+  ) %>%
   datatable(
     rownames = FALSE,
     colnames = c('CMHSP','Waitlised Enrollees','Enrollees','Pct of waitlisted Enrollees'),
@@ -304,32 +299,13 @@ aba_week <-
   filter(FROM_DATE >= as.Date(IPOS_Start_Date)) %>%
   # Only include services if they are in most recent 90 days of dataset
   filter(FROM_DATE >= last_90) %>%
-  mutate(
-    type = recode(
-      CPT_CD,
-      `S5108` = "Observation",
-      `0368T` = "Observation",
-      `0369T` = "Observation",
-      `0364T` = "Treatment",
-      `0365T` = "Treatment",
-      `0366T` = "Treatment",
-      `0367T` = "Treatment",
-      `0372T` = "Treatment",
-      `0373T` = "Treatment",
-      `0374T` = "Treatment",
-      `H2019` = "Treatment"
-    )
-  ) %>%
-  group_by(Case_ID,week,type) %>%
+  group_by(Case_ID,week) %>%
   summarize(
     hrs = sum(hrs, na.rm = T),
     ABA_Hours = max(ABA_Hours, na.rm = T)
   ) %>%
   ungroup() %>%
-  spread(type,hrs) %>%
   mutate(
-    # Recombine for total count
-    hrs = Treatment + Observation,
     # Calculate difference between actual and prescribed hours
     # Negative values indicate hours less than goal
     diff = hrs - ABA_Hours,
@@ -388,7 +364,6 @@ aba_per %>%
 
 
 # Observation Compliance
-
 
 
 ```{r}
@@ -468,6 +443,15 @@ observe %>%
   mutate(pct = round(meets_req / n * 100, digits = 1)) 
   
 observe_agg %>%  
+  # Add subtotal line for PIHP
+  rbind(
+    ., 
+    data.frame(
+      PROVIDER_NAME = "Region 10", 
+      t(colSums(.[2:3])),
+      pct = round(colSums(.[2])/colSums(.[3])*100,digits = 1)
+    )
+  ) %>%
   datatable(
     rownames = FALSE,
     colnames = c('CMHSP','Enrollees with required observation','Enrollees','Percent meeting standard'),
@@ -488,10 +472,11 @@ observe_agg %>%
 
 ```
 
+---
+
 For a detailed view of the individuals who have not received the appropriate level of observation for ABA services, please see the table below:
 
 ```{r}
-
 
 observe %>%
   filter(meets_req == F) %>%
