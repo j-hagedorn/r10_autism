@@ -60,6 +60,7 @@ wsa %>%
   ) 
 
 wsa_tbl %>%
+  arrange(as.character(PIHP_CMH_Name)) %>%
   # Add subtotal line for PIHP
   rbind(
     ., 
@@ -443,6 +444,7 @@ observe %>%
   mutate(pct = round(meets_req / n * 100, digits = 1)) 
   
 observe_agg %>%  
+  arrange(as.character(PROVIDER_NAME)) %>%
   # Add subtotal line for PIHP
   rbind(
     ., 
