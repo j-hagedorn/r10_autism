@@ -465,8 +465,7 @@ waitlist_svs <-
   left_join(svs, by = c("ID" = "MEDICAID_ID")) %>%
   filter(
     # Only include services occurring after eligibility for autism
-    # Including a 90-day window for initial scheduling
-    FROM_DATE > as.Date(Eligibility_Date) + 90
+    FROM_DATE > as.Date(Eligibility_Date) 
     # or if there is no service date (to keep people who didn't receive svs)
     | is.na(FROM_DATE) == T 
   ) %>%
@@ -520,7 +519,7 @@ waitlist_person <-
   mutate(
     # Most recent date in services data pulled
     max_date = max(svs$FROM_DATE),
-    elig_interval = as.numeric(max_date - (Eligibility_Date + 90)),
+    elig_interval = as.numeric(max_date - Eligibility_Date),
     svs_interval = as.numeric(last - first),
     pct_days_svd = round(svs_interval/elig_interval * 100, digits = 1),
     autism_waiver_svs = autism_waiver_svs > 0
