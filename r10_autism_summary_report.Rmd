@@ -426,7 +426,7 @@ observe_agg %>%
 
 # Non-ABA Services for Enrollees Without a Behavioral Plan of Service
 
-For each individual who is autism waiver eligible and on the waitlist, what percent of the days that the person has been on the waitlist are overlapped by the provision of non-ABA services (i.e. `Days receiving services`/`Days on waitlist`)?
+For individuals who is autism waiver eligible and does not have a BPOS, what percent of have not received at least one non-ABA service within the previous 90 days?
 
 ```{r waitlist_create}
 waitlist_svs <-
@@ -441,11 +441,15 @@ waitlist_svs <-
   left_join(svs, by = c("ID" = "MEDICAID_ID")) %>%
   filter(
     # Only include services occurring after eligibility for autism
-    # Including a 90-day window for initial scheduling
-    FROM_DATE > as.Date(Eligibility_Date) + 90    
+    FROM_DATE > as.Date(Eligibility_Date)     
     # or if there is no service date (to keep people who didn't receive svs)
     | is.na(FROM_DATE) == T 
-  ) %>%
+  ) 
+
+waitlist_last90 <-
+  waitlist_svs %>%
+  # Only include services if they are in most recent 90 days of dataset
+  filter(FROM_DATE >= last_90 & is.na(AUTISM_SRV)) %>%
   group_by(Case_ID,PIHP_CMH_Name,CPT_CD,SERVICE_DESC,UNIT_TYPE,AUTISM_SRV,Eligibility_Date) %>%
   # Convert units to a common period
   mutate(
@@ -482,8 +486,72 @@ waitlist_svs <-
     last = max(FROM_DATE)
   ) 
 
+waitlist_all <-
+waitlist_svs %>%
+  group_by(Case_ID,PIHP_CMH_Name,CPT_CD,SERVICE_DESC,UNIT_TYPE,AUTISM_SRV,Eligibility_Date) %>%
+  # Convert units to a common period
+  mutate(
+    # Recode unit type as numeric conversion factor
+    hr_conv = recode(
+      as.character(UNIT_TYPE),
+      `15 Minutes` = '0.25', 
+      `30 Minutes` = '0.5',
+      `Hour` = '1', 
+      `Up to 15 min` = '0.25',
+      `Encounter` = 'NA'
+    ),
+    svs_conv = recode(
+      as.character(SERVICE_DESC),
+      `Psychotherapy, 60 min` = 1, 
+      `Psychotherapy, 45 min` = 0.75,
+      `Psychotherapy, 30 min` = 0.5
+    ),
+    hr_conv = ifelse(is.na(svs_conv) == F,svs_conv,as.numeric(hr_conv)),
+    # Calculate hours
+    hrs = UNITS * hr_conv
+  ) %>%
+  # What is the first and last date of each service?
+  mutate(
+    first = min(FROM_DATE),
+    last = max(FROM_DATE)
+  ) %>%
+  # What is the number of units received?
+  summarize(
+    encounters = n(),
+    units = sum(UNITS, na.rm = T),
+    hrs = sum(hrs, na.rm = T),
+    first = min(FROM_DATE),
+    last = max(FROM_DATE)
+  ) 
+
+waitlist_summary <-
+  waitlist_last90 %>%
+  mutate(
+    has_enc = encounters >= 1
+  ) %>%
+  group_by(PIHP_CMH_Name) %>%
+  summarize(
+    has_enc = sum(has_enc, na.rm = T),
+    denominator = n()
+  ) %>%
+  mutate(
+    numerator = denominator - has_enc,
+    pct = round(numerator / denominator * 100, digits = 1)
+  ) %>% 
+  select(PIHP_CMH_Name,numerator,denominator,pct) %>%
+  arrange(as.character(PIHP_CMH_Name)) %>%
+  # Add subtotal line for PIHP
+  rbind(
+    ., 
+    data.frame(
+      PIHP_CMH_Name = "Region 10", 
+      t(colSums(.[2:3])),
+      pct = round(colSums(.[2])/colSums(.[3])*100,digits = 1)
+    )
+  ) 
+
 waitlist_person <-
-  waitlist_svs %>%
+  waitlist_all %>%
   group_by(Case_ID) %>%
   summarize(
     first = min(first),
@@ -505,13 +573,50 @@ waitlist_person <-
 ```
 
 ```{r waitlist_table}
-
+waitlist_summary %>%
+  datatable(
+    rownames = FALSE,
+    colnames = c('Organization','Enrollees Without Any Services','Total Enrollees without a Behavioral Plan of Service','% Without Services'),
+    extensions = c('Responsive','Buttons'),
+    options = list(
+      dom = 't',
+      buttons = c('colvis')
+    )
+  ) %>%
+  formatStyle(
+    'pct',
+    background = styleColorBar(c(0,100), '#fc8d59'),
+    backgroundSize = '100% 90%',
+    backgroundRepeat = 'no-repeat',
+    backgroundPosition = 'center'
+  )
 
 
 ```
 <br>
-```{r}
-
+```{r waitlist_chart}
+waitlist_summary %>%
+  plot_ly(
+    x = ~PIHP_CMH_Name,
+    y = ~pct,
+    color = I(chart_color)
+  ) %>%
+  add_bars(
+    hoverinfo = 'text',
+    text = ~paste0(
+      "At ", PIHP_CMH_Name,", ", numerator, " out of ",denominator," people (",pct,"%)<br>",
+      "without a BPOS did not receive any non-ABA services."
+    )
+  ) %>%
+  layout(
+    title = "Non-ABA Services for Enrollees without BPOS",
+    xaxis = list(title = "", tickangle = 45),
+    yaxis = list(
+      title = "% without interim services",
+      range = c(0, 100)
+    ),
+    margin = list(l = 60, r = 30, b = 150, t = 40, pad = 4)
+  )
 ```
 
 ---
