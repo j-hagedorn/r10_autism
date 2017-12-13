@@ -1,20 +1,22 @@
 ---
-title: "Autism Waiver Compliance: Summary Report"
+title: "Autism Benefit Compliance"
 output: 
   html_document
 ---
 
 ```{r setup, include=FALSE}
-knitr::opts_chunk$set(echo=FALSE, message=FALSE, warning=FALSE)
+knitr::opts_chunk$set(echo = FALSE, message = FALSE, warning = FALSE)
 ```
 
-```{r}
+```{r load_libs}
 # Load required packages
 library(tidyverse); library(stringr); library(magrittr); library(lubridate); library(readxl)
 library(DT); library(forcats); library(plotly); library(sparkline);library(feather)
+
+chart_color <- c("#e34a33")
 ```
 
-```{r}
+```{r get_data}
 
 # Read in .csv files as dataframes
 csv_path <- "data/"
@@ -28,28 +30,38 @@ wsa_ipos <- read_feather(paste0(csv_path,"wsa_ipos.feather"))
 
 ```
 
-### This report was generated for Region 10 PIHP on `r max(svs$FROM_DATE)`
+<h4>This *summary* report was generated for Region 10 PIHP on `r Sys.Date()` using data from `r min(svs$FROM_DATE)` - `r max(svs$FROM_DATE)`</h4>
 
 *Please note that the data in this report may not reflect the services of all enrollees that participated in the Autism Waiver Program.  Specifically, enrollee services may not show in the data for more recent periods where claims were not yet submitted.*
 
 ---
 
-# Enrollees without a Behavioral Plan of Service
+# Overdue Re-Evaluations
 
-```{r}
+
+---
+
+# Overdue Plans of Service
+
+
+---
+
+# Overdue Service Start
+
+Enrollees approved for ABA and are awaiting the development of an ABA behavior treatment plan to begin services.
+
+```{r start_create}
 wsa_tbl <-
 wsa %>%
   filter(Status == "Open") %>%
   group_by(PIHP_CMH_Name) %>%
   summarize(
-    without_IPOS = n() - sum(IPOSExists, na.rm = T),
-    all = n()
+    numerator = n() - sum(IPOSExists, na.rm = T),
+    denominator = n()
   ) %>%
   mutate(
-    pct = round(without_IPOS / all * 100, digits = 1)
-  ) 
-
-wsa_tbl %>%
+    pct = round(numerator / denominator * 100, digits = 1)
+  ) %>%
   arrange(as.character(PIHP_CMH_Name)) %>%
   # Add subtotal line for PIHP
   rbind(
@@ -59,11 +71,16 @@ wsa_tbl %>%
       t(colSums(.[2:3])),
       pct = round(colSums(.[2])/colSums(.[3])*100,digits = 1)
     )
-  ) %>%
+  ) 
+
+  
+```
+
+```{r start_table}
+wsa_tbl %>%
   datatable(
     rownames = FALSE,
-    colnames = c('CMHSP','Waitlisted Enrollees','Enrollees','Pct of Waitlisted Enrollees'),
-    caption = 'Percentage of Autism waiver enrollees without IPOS, by CMHSP',
+    colnames = c('Organization','Overdue Enrollees','Total Enrollees','% of Enrollees Overdue'),
     extensions = c('Responsive','Buttons'),
     options = list(
       dom = 't',
@@ -72,122 +89,50 @@ wsa_tbl %>%
   ) %>%
   formatStyle(
     'pct',
-    background = styleColorBar(c(0,100), 'grey'),
+    background = styleColorBar(c(0,100), '#fc8d59'),
     backgroundSize = '100% 90%',
     backgroundRepeat = 'no-repeat',
     backgroundPosition = 'center'
   )
-  
 ```
+<br>
+```{r start_chart}
+wsa_tbl %>%
+  plot_ly(
+    x = ~PIHP_CMH_Name,
+    y = ~pct,
+    color = I(chart_color)
+  ) %>%
+  add_bars(
+    hoverinfo = 'text',
+    text = ~paste0(
+      "At ", PIHP_CMH_Name,", ", numerator, " out of ",denominator," people (",pct,"%)<br>",
+      "were overdue to start autism services."
+    )
+  ) %>%
+  layout(
+    title = "Overdue Start Date",
+    xaxis = list(title = "", tickangle = 45),
+    yaxis = list(
+      title = "% of total enrollees with overdue service start",
+      range = c(0, 100)
+    ),
+    margin = list(l = 60, r = 30, b = 150, t = 40, pad = 4)
+  )
+  
+
+```
+
 
 ---
 
-# Interim Services for Waitlisted enrollees
+# Range of Intensity Non-Compliance
 
-## Percent of Days Receiving Services per Waitlisted Enrollee
+What percent of beneficiaries have received ABA services which fall outside of the acceptable range (*i.e. <75% or >125%*) of the prescribed hours?
 
-For each individual who is autism waiver eligible and on the waitlist, what percent of the days that the person has been on the waitlist are overlapped by the provision of non-ABA services (i.e. `Days receiving services`/`Days on waitlist`)?
+```{r roi_create}
 
-```{r}
-waitlist_svs <-
-  wsa %>%
-  # Filter individuals who are on waitlist
-  filter(
-    Status == "Open"
-    & IPOSExists == F
-    & is.na(Eligibility_Date) == F
-  ) %>%
-  select(ID,Case_ID,PIHP_CMH_Name,Referral_Date:Eligibility_End_Date) %>%
-  left_join(svs, by = c("ID" = "MEDICAID_ID")) %>%
-  filter(
-    # Only include services occurring after eligibility for autism
-    # Including a 90-day window for initial scheduling
-    FROM_DATE > as.Date(Eligibility_Date) + 90    
-    # or if there is no service date (to keep people who didn't receive svs)
-    | is.na(FROM_DATE) == T 
-  ) %>%
-  group_by(Case_ID,PIHP_CMH_Name,CPT_CD,SERVICE_DESC,UNIT_TYPE,AUTISM_SRV,Eligibility_Date) %>%
-  # Convert units to a common period
-  mutate(
-    # Recode unit type as numeric conversion factor
-    hr_conv = recode(
-      as.character(UNIT_TYPE),
-      `15 Minutes` = '0.25', 
-      `30 Minutes` = '0.5',
-      `Hour` = '1', 
-      `Up to 15 min` = '0.25',
-      `Encounter` = 'NA'
-    ),
-    svs_conv = recode(
-      as.character(SERVICE_DESC),
-      `Psychotherapy, 60 min` = 1, 
-      `Psychotherapy, 45 min` = 0.75,
-      `Psychotherapy, 30 min` = 0.5
-    ),
-    hr_conv = ifelse(is.na(svs_conv) == F,svs_conv,as.numeric(hr_conv)),
-    # Calculate hours
-    hrs = UNITS * hr_conv
-  ) %>%
-  # What is the first and last date of each service?
-  mutate(
-    first = min(FROM_DATE),
-    last = max(FROM_DATE)
-  ) %>%
-  # What is the number of units received?
-  summarize(
-    encounters = n(),
-    units = sum(UNITS, na.rm = T),
-    hrs = sum(hrs, na.rm = T),
-    first = min(FROM_DATE),
-    last = max(FROM_DATE)
-  ) 
-
-```
-
-
-```{r}
-waitlist_person <-
-  waitlist_svs %>%
-  group_by(Case_ID) %>%
-  summarize(
-    first = min(first),
-    last = max(last),
-    Eligibility_Date = as.Date(max(Eligibility_Date)),
-    svs_list = paste(SERVICE_DESC, collapse = ', '),
-    encounters = sum(encounters),
-    autism_waiver_svs = sum(AUTISM_SRV, na.rm = T)
-  ) %>%
-  mutate(
-    # Most recent date in services data pulled
-    max_date = max(svs$FROM_DATE),
-    elig_interval = as.numeric(max_date - (Eligibility_Date + 90)),
-    svs_interval = as.numeric(last - first),
-    pct_days_svd = round(svs_interval/elig_interval * 100, digits = 1),
-    autism_waiver_svs = autism_waiver_svs > 0
-  )
-
-waitlist_person %>%
-  plot_ly(
-    x = ~pct_days_svd,
-    hoverinfo = 'y+text',
-    text = ~paste0("# of waitlisted individuals received services<br>",
-                   "around this much of the time they were on the waitlist")
-  ) %>%
-  layout(
-    xaxis = list(title = "% of eligible days receiving services"), 
-    yaxis = list(title = "# of waitlisted individuals"), 
-    showlegend = FALSE
-  )
-
-```
-
-# Conformance with Prescribed Hours for ABA Services
-
-What percent of individuals have received ABA services which fall outside of the acceptable range (*i.e. <75% or >125%*) of the prescribed hours?
-
-```{r}
-
-#### Calculate ABA services per week per person ####
+#### Calculate ABA services per week per person 
 
 # Define ABA codes
 aba_cpt <- c("S5108", # Old observation code
@@ -254,26 +199,28 @@ aba_summary <-
     # Tag Compliant and Non-Compliant weeks
    
     pct_all = round(sum(hrs) / sum(ABA_Hours) * 100, digits = 1),
-    in_range_all = ifelse(between(pct_all,75,125),T,F))%>%
+    in_range_all = ifelse(between(pct_all,75,125),T,F)
+  ) %>%
   ungroup() %>%
   group_by(Case_ID,PROVIDER_NAME) %>%
   summarise(
     hrs = sum(hrs, na.rm = T),
     ABA_Hours = sum(ABA_Hours, na.rm = T)
-  )%>%
-  mutate(
-    pct = round(hrs / ABA_Hours * 100, digits = 1),
-    in_range = ifelse(between(pct,75,125),T,F))%>%
-  group_by(PROVIDER_NAME)%>%
-  summarise(
-    numerator=sum(in_range),
-    denominator=n()
   ) %>%
   mutate(
-    pct=round(numerator/denominator*100,digits=1)
-  )
-
-aba_summary %>% 
+    pct = round(hrs / ABA_Hours * 100, digits = 1),
+    in_range = ifelse(between(pct,75,125),T,F)
+  ) %>%
+  group_by(PROVIDER_NAME) %>%
+  summarise(
+    in_range =  sum(in_range),
+    denominator = n()
+  ) %>%
+  mutate(
+    numerator = denominator - in_range,
+    pct = round(numerator/denominator * 100, digits = 1)
+  ) %>% 
+  select(PROVIDER_NAME,numerator,denominator,pct) %>%
   arrange(as.character(PROVIDER_NAME)) %>%
   # Add subtotal line for PIHP
   rbind(
@@ -283,11 +230,15 @@ aba_summary %>%
       t(colSums(.[2:3])),
       pct = round(colSums(.[2])/colSums(.[3])*100,digits = 1)
     )
-  ) %>%
+  ) 
+
+```
+
+```{r roi_table}
+aba_summary %>%
   datatable(
     rownames = FALSE,
-    colnames = c('CMHSP','Enrollees within prescribed range','Enrollees receiving ABA Services','Percent meeting standard'),
-    caption = 'Percentage of Autism waiver enrollees receiving prescribed ABA hours, by CMHSP for the last 90 days',
+    colnames = c('Organization','Enrollees Non-Compliant','Total Enrollees with a Behavioral Plan of Service','% Non-Compliant'),
     extensions = c('Responsive','Buttons'),
     options = list(
       dom = 't',
@@ -297,18 +248,43 @@ aba_summary %>%
   formatStyle(
     'pct',
     backgroundSize = '100% 90%',
-    background = styleColorBar(c(0,100), 'grey'),
+    background = styleColorBar(c(0,100), '#fc8d59'),
     backgroundRepeat = 'no-repeat',
     backgroundPosition = 'center'
   )
-
+```
+<br>
+```{r roi_chart}
+aba_summary %>%
+  plot_ly(
+    x = ~PROVIDER_NAME,
+    y = ~pct,
+    color = I(chart_color)
+  ) %>%
+  add_bars(
+    hoverinfo = 'text',
+    text = ~paste0(
+      "At ", PROVIDER_NAME,", ", numerator, " out of ",denominator," people (",pct,"%)<br>",
+      "did not receive ABA services at the required intensity."
+    )
+  ) %>%
+  layout(
+    title = "Range of Intensity Non-Compliance",
+    xaxis = list(title = "", tickangle = 45),
+    yaxis = list(
+      title = "% non-compliant",
+      range = c(0, 100)
+    ),
+    margin = list(l = 60, r = 30, b = 150, t = 40, pad = 4)
+  )
 ```
 
-# Required Observation of ABA Services
 
+---
 
+# Observation Non-Compliance
 
-```{r}
+```{r observe_create}
 # Note: uses filters defined above for service codes and clients included
 
 observe <-
@@ -380,11 +356,13 @@ observe %>%
   group_by(PROVIDER_NAME) %>%
   summarize(
     meets_req = sum(meets_req, na.rm = T),
-    n = n()
+    denominator = n()
   ) %>%
-  mutate(pct = round(meets_req / n * 100, digits = 1)) 
-  
-observe_agg %>% 
+  mutate(
+    numerator = denominator - meets_req,
+    pct = round(numerator / denominator * 100, digits = 1)
+  ) %>% 
+  select(PROVIDER_NAME,numerator,denominator,pct) %>%
   arrange(as.character(PROVIDER_NAME)) %>%
   # Add subtotal line for PIHP
   rbind(
@@ -394,11 +372,15 @@ observe_agg %>%
       t(colSums(.[2:3])),
       pct = round(colSums(.[2])/colSums(.[3])*100,digits = 1)
     )
-  ) %>%
+  ) 
+
+```
+
+```{r observe_table}
+observe_agg %>%
   datatable(
     rownames = FALSE,
-    colnames = c('CMHSP','Enrollees with required observation','Enrollees receiving ABA Services','Percent meeting standard'),
-    caption = 'Percentage of Autism waiver enrollees receiving required observation, by CMHSP',
+    colnames = c('Organization','Enrollees Non-Compliant','Total Enrollees with a Behavioral Plan of Service','% Non-Compliant'),
     extensions = c('Responsive','Buttons'),
     options = list(
       dom = 't',
@@ -407,11 +389,170 @@ observe_agg %>%
   ) %>%
   formatStyle(
     'pct',
-    background = styleColorBar(c(0,100), 'grey'),
+    background = styleColorBar(c(0,100), '#fc8d59'),
     backgroundSize = '100% 90%',
     backgroundRepeat = 'no-repeat',
     backgroundPosition = 'center'
   )
+```
+<br>
+```{r observe_chart}
+observe_agg %>%
+  plot_ly(
+    x = ~PROVIDER_NAME,
+    y = ~pct,
+    color = I(chart_color)
+  ) %>%
+  add_bars(
+    hoverinfo = 'text',
+    text = ~paste0(
+      "At ", PROVIDER_NAME,", ", numerator, " out of ",denominator," people (",pct,"%)<br>",
+      "did not receive the required level of observation for ABA services."
+    )
+  ) %>%
+  layout(
+    title = "Observation Non-Compliance",
+    xaxis = list(title = "", tickangle = 45),
+    yaxis = list(
+      title = "% non-compliant",
+      range = c(0, 100)
+    ),
+    margin = list(l = 60, r = 30, b = 150, t = 40, pad = 4)
+  )
+```
+
+
+---
+
+# Non-ABA Services for Enrollees Without a Behavioral Plan of Service
+
+For each individual who is autism waiver eligible and on the waitlist, what percent of the days that the person has been on the waitlist are overlapped by the provision of non-ABA services (i.e. `Days receiving services`/`Days on waitlist`)?
+
+```{r waitlist_create}
+waitlist_svs <-
+  wsa %>%
+  # Filter individuals who are on waitlist
+  filter(
+    Status == "Open"
+    & IPOSExists == F
+    & is.na(Eligibility_Date) == F
+  ) %>%
+  select(ID,Case_ID,PIHP_CMH_Name,Referral_Date:Eligibility_End_Date) %>%
+  left_join(svs, by = c("ID" = "MEDICAID_ID")) %>%
+  filter(
+    # Only include services occurring after eligibility for autism
+    # Including a 90-day window for initial scheduling
+    FROM_DATE > as.Date(Eligibility_Date) + 90    
+    # or if there is no service date (to keep people who didn't receive svs)
+    | is.na(FROM_DATE) == T 
+  ) %>%
+  group_by(Case_ID,PIHP_CMH_Name,CPT_CD,SERVICE_DESC,UNIT_TYPE,AUTISM_SRV,Eligibility_Date) %>%
+  # Convert units to a common period
+  mutate(
+    # Recode unit type as numeric conversion factor
+    hr_conv = recode(
+      as.character(UNIT_TYPE),
+      `15 Minutes` = '0.25', 
+      `30 Minutes` = '0.5',
+      `Hour` = '1', 
+      `Up to 15 min` = '0.25',
+      `Encounter` = 'NA'
+    ),
+    svs_conv = recode(
+      as.character(SERVICE_DESC),
+      `Psychotherapy, 60 min` = 1, 
+      `Psychotherapy, 45 min` = 0.75,
+      `Psychotherapy, 30 min` = 0.5
+    ),
+    hr_conv = ifelse(is.na(svs_conv) == F,svs_conv,as.numeric(hr_conv)),
+    # Calculate hours
+    hrs = UNITS * hr_conv
+  ) %>%
+  # What is the first and last date of each service?
+  mutate(
+    first = min(FROM_DATE),
+    last = max(FROM_DATE)
+  ) %>%
+  # What is the number of units received?
+  summarize(
+    encounters = n(),
+    units = sum(UNITS, na.rm = T),
+    hrs = sum(hrs, na.rm = T),
+    first = min(FROM_DATE),
+    last = max(FROM_DATE)
+  ) 
+
+waitlist_person <-
+  waitlist_svs %>%
+  group_by(Case_ID) %>%
+  summarize(
+    first = min(first),
+    last = max(last),
+    Eligibility_Date = as.Date(max(Eligibility_Date)),
+    svs_list = paste(SERVICE_DESC, collapse = ', '),
+    encounters = sum(encounters),
+    autism_waiver_svs = sum(AUTISM_SRV, na.rm = T)
+  ) %>%
+  mutate(
+    # Most recent date in services data pulled
+    max_date = max(svs$FROM_DATE),
+    elig_interval = as.numeric(max_date - (Eligibility_Date + 90)),
+    svs_interval = as.numeric(last - first),
+    pct_days_svd = round(svs_interval/elig_interval * 100, digits = 1),
+    autism_waiver_svs = autism_waiver_svs > 0
+  )
 
 ```
+
+```{r waitlist_table}
+
+
+
+```
+<br>
+```{r}
+
+```
+
+---
+
+# Glossary
+
+**ABA Services:** Services provided by the CMHSP, or contracted ABA provider, which include the S5108, H2019, 0364T, 0365T, 0366T, 0367T, 0372T, 0373T, 0374T, 0368T, and 0369T service codes reported with a U5 modifier. (Note: U5 modifier must be reported on all encounters covered by the EPSDT Autism Benefit).
+
+**Behavioral Plan of Service (BPOS):** In WSA, this includes the ABA behavioral plan and the related Individual Plan of Service created by the CMHSP. 
+
+**Days Without a Behavioral Plan of Service: **  The number of days without a Behavioral Plan of Service following eligibility determination date.  
+
+**Eligibility Determination Date:** The date that MDHHS determines that an individual is eligible for ABA services.  
+
+**Enrollee:** A person found eligible for the Autism Benefit, as determined by MDHHS. 
+
+**Family Training:**  Required service provided by qualified practitioner. At least 1 encounter / 90 days meets the standard.  The service codes for Family Training are 0370T and 0371T.
+
+**Hours of Service: ** ABA services including supervision/observation. 
+
+**Hours of Treatment:** ABA services excluding supervision/observation.
+
+**Number of Encounters:** The total count of service encounters received. Note: if multiple units are received as part of a single encounter, the encounter will only be counted once.    
+
+**Observation of ABA Services:** The standard is for every 10 hours of ABA treatment provided to an individual enrollee, 1 hour of supervision/observation by a qualified practitioner will be provided. The service codes for observation are S5108, 0368T, and 0369T with a U5 modifier.
+
+**Overdue Plans of Service: ** Cases with an expired plan of service in WSA.
+
+**Overdue Re-Evaluation:** Cases with an expired re-evaluation (364 days from most recent evaluation end date) in WSA.
+
+**Overdue Service Start:** Individuals determined eligible for ABA services awaiting the development of an ABA treatment plan to begin services.
+
+**Prescribed Hours:** The number of hours an enrollee is authorized for ABA services based on assessed need and recommendation. This number is entered in WSA by the CMHSPs.
+
+**Range of Intensity:** The hours of ABA treatment provided; within 25% +/- of prescribed hours meets the standard.
+
+**Ratio of Observation to Treatment:** The result of dividing the number of hours of ‘observation of ABA Services’ by ‘hours of treatment’. A ratio value of greater than or equal to 0.1 (1 hour of observation for every 10 hours of treatment) meets the standard.
+
+**Services Provided:** A list of services (i.e. the descriptions which accompany HCPCS codes) that the enrollee has received. 
+
+**Waiver Support Application (WSA):** The electronic platform used by MDHHS, PIHPs, and CMHs to monitor the Autism Benefit and enrollees. 
+
+
 
