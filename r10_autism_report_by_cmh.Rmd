@@ -3,12 +3,12 @@ title: "Autism Service Compliance"
 params:
   cmh: Genesee Health System
 output:
-  pdf_document: default
   html_document: default
+  pdf_document: default
 ---
 
 ```{r setup, include=FALSE}
-knitr::opts_chunk$set(echo=FALSE, message=FALSE, warning=FALSE)
+knitr::opts_chunk$set(echo=FALSE, message = FALSE, warning = FALSE)
 ```
 
 ### This report was generated for `r paste0(params$cmh)` on `r Sys.Date()`
@@ -26,13 +26,12 @@ library(data.table); library(reshape2); library(dplyr)
 
 The data for these analyses is drawn from two primary sources: 
 
-
 First, we read in the services data and process it for analysis.  Note that we are currently reading from .csv file output for this draft analysis.  A repeatable, automated process will rely on connection to database tables updated via an extract-transfer-load (ETL) process.
 
 ```{r}
 
 # Read in .csv files as dataframes
-csv_path <- "S:/Region 10/Lisa Yang/r10_autism-master/"
+csv_path <- "data/"
 svs <- read_feather(paste0(csv_path,"svs.feather"))
 
 # Filter df by defined parameter (i.e.. CMH name)
@@ -103,12 +102,15 @@ The following analyses will ask different questions for the groups represented h
 
 # Non-ABA services for Waitlisted enrollees
 
-## Services per Waitlisted Enrollees
+For each waitlisted enrollee, what non-ABA services are he/she receiving while they are waiting? At what frequency?  The table below shows a summary of services received by each enrollee in the waiver who has been placed on the waitlist.  It includes the following information:
 
-For each waitlisted enrollee, what non-ABA services are he/she receiving while they are waiting? At what frequency?  The table below shows a summary of services received by each enrollee in the waiver who has been placed on the waitlist.^[]  It includes the following information:
+- *Encounters per month*: A trendline of the number of encounters the individual received per month during the time they have been on the waitlist.
+- *Services provided*: A list of all services which appear in the encounter data for the individual from the time that they enrolled in the Autism Waiver.
+- *Days on waitlist*: The number of days that the individual has been on the waitlist.
+- *Percent days covered*: The number of days between the first and last date that the person received services while on the waitlist, as a percentage of the total number of days on the waitlist.
+- *Total Number of encounters*: The total number of encounters, for any type of service, that the individual received while on the waitlist.
 
-
-```{r}
+```{r waitlist_ind_data}
 
 waitlist_svs <-
   wsa %>%
@@ -122,7 +124,8 @@ waitlist_svs <-
   left_join(svs, by = c("ID" = "MEDICAID_ID")) %>%
   filter(
     # Only include services occurring after eligibility for autism
-    FROM_DATE >= as.Date(Eligibility_Date) 
+    # Including a 90-day window for initial scheduling
+    FROM_DATE > as.Date(Eligibility_Date) + 90
     # or if there is no service date (to keep people who didn't receive svs)
     | is.na(FROM_DATE) == T 
   ) %>%
@@ -164,7 +167,7 @@ waitlist_svs <-
 
 waitlist_person <-
   waitlist_svs %>%
-  group_by(Case_ID) %>%
+  group_by(Case_ID,PIHP_CMH_Name) %>%
   summarize(
     first = min(first),
     last = max(last),
@@ -176,14 +179,14 @@ waitlist_person <-
   mutate(
     # Most recent date in services data pulled
     max_date = max(svs$FROM_DATE),
-    elig_interval = as.numeric(max_date - Eligibility_Date),
+    elig_interval = as.numeric(max_date - (Eligibility_Date + 90)),
     svs_interval = as.numeric(last - first),
     pct_days_svd = round(svs_interval/elig_interval * 100, digits = 1),
     autism_waiver_svs = autism_waiver_svs > 0
   )
 
 t1 <- waitlist_person %>%
-  select(Case_ID,svs_list,elig_interval,svs_interval,pct_days_svd,encounters,autism_waiver_svs) %>%
+  select(Case_ID,PIHP_CMH_Name,svs_list,elig_interval,pct_days_svd,encounters,autism_waiver_svs) %>%
   ungroup() %>%
   arrange(pct_days_svd)
 
@@ -210,33 +213,42 @@ t2 <- wsa %>%
   summarize(Encounters = n()) %>%
   ungroup() %>%
   group_by(Case_ID) %>%
-  summarise(
-    Encounters = paste(Encounters, collapse = ","))
+  summarise(Encounters = paste(Encounters, collapse = ","))
 
 r <- range(t2$Encounters) # define min/max # of encounters for sparkline
 
 t3 <- merge(x = t2, y = t1, by = "Case_ID", all.x = TRUE) # join t1 ad t2
+```
 
-
+```{r def_spark}
 # Define attributes of line spark
 line_string <- "type: 'line', lineColor: 'black', fillColor: '#ccc', highlightLineColor: 'orange', highlightSpotColor: 'orange'"
 
 cd <- list(list(targets = 1, render = JS("function(data, type, full){ return '<span class=sparkSeries>' + data + '</span>' }")))
 
-cb = JS(paste0("function (oSettings, json) {
-               \n  $('.sparkSeries:not(:has(canvas))').sparkline('html', { ", line_string, " });
-               \n}")
-        , collapse = "")
+cb <- 
+  JS(
+    paste0(
+      "function (oSettings, json) {\n $('.sparkSeries:not(:has(canvas))').sparkline('html', { ",
+      line_string, " });\n}"
+    ), 
+    collapse = ""
+  )
+```
+
+```{r waitlist_tbl}
 
 dt <- t3 %>%
+  filter(autism_waiver_svs == F) %>%
+  select(-autism_waiver_svs) %>%
   datatable(
     data.table(),
+    caption = "Non-ABA Services provided to Waitlisted Enrollees",
     rownames = FALSE,
-    colnames = c('WSA ID','Consistency of Encounters',
-                 'Services provided',
-                 'Days on waitlist','Days receiving services','Percent days covered',
-                 'Total Number of encounters','Contains waiver services'),
-    caption = 'Service coverage for individuals on Autism Waiver waitlist, by Enrollee',
+    colnames = c('WSA ID','Encounters per month',
+                 'CMHSP','Services provided',
+                 'Days on waitlist','Percent days covered',
+                 'Total Number of encounters'),
     extensions = c('Responsive','Buttons'),
     options = list(
       columnDefs = cd,
@@ -248,9 +260,44 @@ dt <- t3 %>%
     )
 
 dt$dependencies <- append(dt$dependencies, htmlwidgets:::getDependency("sparkline"))
+
 dt
 
 ```
+
+# ABA Services for Enrollees Reportedly on Waitlist
+
+Some individuals are shown as being on the waitlist in the WSA system, but their service data shows that they have received ABA services.  This may indicate the need to update the individuals' status in the WSA system.  Note that addressing these changes in the WSA system will improve performance on the *Enrollees without a Behavioral Plan of Service* measure above.
+
+These individuals are shown in the table below:
+
+```{r}
+dt <- t3 %>%
+  filter(autism_waiver_svs == T) %>%
+  select(-autism_waiver_svs) %>%
+  datatable(
+    data.table(),
+    caption = "ABA-inclusive Services provided to Waitlisted Enrollees",
+    rownames = FALSE,
+    colnames = c('WSA ID','Encounters per month',
+                 'CMHSP','Services provided',
+                 'Days on waitlist','Percent days covered',
+                 'Total Number of encounters'),
+    extensions = c('Responsive','Buttons'),
+    options = list(
+      columnDefs = cd,
+      pageLength = 5,
+      lengthMenu = c(5, 15, 25, 50),
+      fnDrawCallback = cb,
+      # dom = 't',
+      buttons = c('colvis'))
+    )
+
+dt$dependencies <- append(dt$dependencies, htmlwidgets:::getDependency("sparkline"))
+
+dt
+```
+
 
 # Range of Intensity Compliance
 
@@ -281,6 +328,8 @@ svs %>%
     CPT_CD %in% aba_cpt
     & USED_MOD == "U5" # Only include U5 modifier for Autism services
   ) %>%
+  # Now remove observation codes
+  filter(!CPT_CD %in% c("S5108","0368T","0369T")) %>%
   droplevels() %>%
   mutate(
     # Recode unit type as numeric conversion factor
@@ -315,6 +364,7 @@ aba_week <-
     hrs = sum(hrs, na.rm = T),
     ABA_Hours = max(ABA_Hours, na.rm = T)
   ) %>%
+  ungroup() %>%
   mutate(
     # Calculate difference between actual and prescribed hours
     # Negative values indicate hours less than goal
@@ -516,3 +566,42 @@ observe %>%
 
 ```
 
+---
+
+# Glossary
+
+**ABA Services:** Services provided by the CMHSP, or contracted ABA provider, which include the S5108, H2019, 0364T, 0365T, 0366T, 0367T, 0372T, 0373T, 0374T, 0368T, and 0369T service codes reported with a U5 modifier. (Note: U5 modifier must be reported on all encounters covered by the EPSDT Autism Benefit).
+
+**Behavioral Plan of Service (BPOS):** In WSA, this includes the ABA behavioral plan and the related Individual Plan of Service created by the CMHSP. 
+
+**Days Without a Behavioral Plan of Service:**  The number of days without a Behavioral Plan of Service following eligibility determination date.  
+
+**Eligibility Determination Date:** The date that MDHHS determines that an individual is eligible for ABA services.  
+
+**Enrollee:** A person found eligible for the Autism Benefit, as determined by MDHHS. 
+
+**Family Training:**  Required service provided by qualified practitioner. At least 1 encounter / 90 days meets the standard.  The service codes for Family Training are 0370T and 0371T.
+
+**Hours of Service:** ABA services including supervision/observation. 
+
+**Hours of Treatment:** ABA services excluding supervision/observation.
+
+**Number of Encounters:** The total count of service encounters received. Note: if multiple units are received as part of a single encounter, the encounter will only be counted once.    
+
+**Observation of ABA Services:** The standard is for every 10 hours of ABA treatment provided to an individual enrollee, 1 hour of supervision/observation by a qualified practitioner will be provided. The service codes for observation are S5108, 0368T, and 0369T with a U5 modifier.
+
+**Overdue Plans of Service:** Cases with an expired plan of service in WSA.
+
+**Overdue Re-Evaluation:** Cases with an expired re-evaluation (364 days from most recent evaluation end date) in WSA.
+
+**Overdue Service Start:** Individuals determined eligible for ABA services awaiting the development of an ABA treatment plan to begin services.
+
+**Prescribed Hours:** The number of hours an enrollee is authorized for ABA services based on assessed need and recommendation. This number is entered in WSA by the CMHSPs.
+
+**Range of Intensity:** The hours of ABA treatment provided; within 25% +/- of prescribed hours meets the standard.
+
+**Ratio of Observation to Treatment:** The result of dividing the number of hours of ‘observation of ABA Services’ by ‘hours of treatment’. A ratio value of greater than or equal to 0.1 (1 hour of observation for every 10 hours of treatment) meets the standard.
+
+**Services Provided:** A list of services (i.e. the descriptions which accompany HCPCS codes) that the enrollee has received. 
+
+**Waiver Support Application (WSA):** The electronic platform used by MDHHS, PIHPs, and CMHs to monitor the Autism Benefit and enrollees. 
