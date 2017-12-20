@@ -1,7 +1,11 @@
 ---
 title: "Autism Benefit Compliance"
-output: 
-  html_document
+output:
+  html_document:
+    self_contained: yes
+    theme: yeti
+  word_document: default
+always_allow_html: yes
 ---
 
 ```{r setup, include=FALSE}
@@ -11,7 +15,7 @@ knitr::opts_chunk$set(echo = FALSE, message = FALSE, warning = FALSE)
 ```{r load_libs}
 # Load required packages
 library(tidyverse); library(stringr); library(magrittr); library(lubridate); library(readxl)
-library(DT); library(forcats); library(plotly); library(sparkline);library(feather)
+library(DT); library(forcats); library(plotly); library(sparkline);library(feather);library(webshot)
 
 chart_color <- c("#e34a33")
 ```
@@ -32,17 +36,179 @@ wsa_ipos <- read_feather(paste0(csv_path,"wsa_ipos.feather"))
 
 <h4>This *summary* report was generated for Region 10 PIHP on `r Sys.Date()` using data from `r min(svs$FROM_DATE)` - `r max(svs$FROM_DATE)`</h4>
 
-*Please note that the data in this report may not reflect the services of all enrollees that participated in the Autism Waiver Program.  Specifically, enrollee services may not show in the data for more recent periods where claims were not yet submitted.*
+*Please note that the data in this report may not reflect all services that enrollees received from the Autism Benefit.  Specifically, services may not appear for more recent periods if claims have not yet been submitted.*
 
 ---
 
 # Overdue Re-Evaluations
 
+```{r reeval_create}
+reeval_tbl <-
+wsa %>%
+  filter(Status == "Open") %>%
+  mutate(
+    past_due = ReEvaluation_Due_Date < today()
+  ) %>%
+  group_by(PIHP_CMH_Name) %>%
+  summarize(
+    numerator = sum(past_due, na.rm = T),
+    denominator = n()
+  ) %>%
+  mutate(
+    pct = round(numerator / denominator * 100, digits = 1)
+  ) %>%
+  arrange(as.character(PIHP_CMH_Name)) %>%
+  # Add subtotal line for PIHP
+  rbind(
+    ., 
+    data.frame(
+      PIHP_CMH_Name = "Region 10", 
+      t(colSums(.[2:3])),
+      pct = round(colSums(.[2])/colSums(.[3])*100,digits = 1)
+    )
+  ) %>%
+  select(PIHP_CMH_Name,denominator,numerator,pct)
+```
+
+```{r reeval_table}
+reeval_tbl %>%
+  datatable(
+    rownames = FALSE,
+    colnames = c('Organization','Total Enrollees','Overdue Re-Evaluations','% of Enrollees Overdue'),
+    extensions = c('Responsive','Buttons'),
+    options = list(
+      dom = 't',
+      buttons = c('colvis')
+    )
+  ) %>%
+  formatStyle(
+    'pct',
+    background = styleColorBar(c(0,100), '#fc8d59'),
+    backgroundSize = '100% 90%',
+    backgroundRepeat = 'no-repeat',
+    backgroundPosition = 'center'
+  )
+```
+<br>
+```{r reeval_chart}
+reeval_tbl %>%
+  mutate(
+    PIHP_CMH_Name = fct_relevel(
+      PIHP_CMH_Name,
+      c(
+        "Genesee Health System","Lapeer County CMH","Sanilac County CMH",
+        "St. Clair County CMH","Region 10"
+      )
+    )
+  ) %>%
+  plot_ly(
+    x = ~PIHP_CMH_Name,
+    y = ~pct,
+    color = I(chart_color)
+  ) %>%
+  add_bars(
+    hoverinfo = 'text',
+    text = ~paste0(
+      "At ", PIHP_CMH_Name,", ", numerator, " out of ",denominator," people (",pct,"%)<br>",
+      "are overdue to receive re-evaluations."
+    )
+  ) %>%
+  layout(
+    title = "Compliance with Re-Evaluations",
+    xaxis = list(title = "", tickangle = 45),
+    yaxis = list(
+      title = "% of total enrollees with overdue re-evaluations",
+      range = c(0, 100)
+    ),
+    margin = list(l = 60, r = 30, b = 150, t = 40, pad = 4)
+  )
+```
 
 ---
 
 # Overdue Plans of Service
 
+```{r bpos_create}
+bpos_tbl <-
+wsa %>%
+  filter(Status == "Open" & IPOSExists == T) %>%
+  mutate(
+    past_due = IPOS_Due_Date < today()
+  ) %>%
+  group_by(PIHP_CMH_Name) %>%
+  summarize(
+    numerator = sum(past_due, na.rm = T),
+    denominator = n()
+  ) %>%
+  mutate(
+    pct = round(numerator / denominator * 100, digits = 1)
+  ) %>%
+  arrange(as.character(PIHP_CMH_Name)) %>%
+  # Add subtotal line for PIHP
+  rbind(
+    ., 
+    data.frame(
+      PIHP_CMH_Name = "Region 10", 
+      t(colSums(.[2:3])),
+      pct = round(colSums(.[2])/colSums(.[3])*100,digits = 1)
+    )
+  ) %>%
+  select(PIHP_CMH_Name,denominator,numerator,pct)
+```
+
+```{r bpos_table}
+bpos_tbl %>%
+  datatable(
+    rownames = FALSE,
+    colnames = c('Organization','Total Enrollees with BPOS','Overdue BPOS','% of Enrollees Overdue'),
+    extensions = c('Responsive','Buttons'),
+    options = list(
+      dom = 't',
+      buttons = c('colvis')
+    )
+  ) %>%
+  formatStyle(
+    'pct',
+    background = styleColorBar(c(0,100), '#fc8d59'),
+    backgroundSize = '100% 90%',
+    backgroundRepeat = 'no-repeat',
+    backgroundPosition = 'center'
+  )
+```
+<br>
+```{r bpos_chart}
+bpos_tbl %>%
+  mutate(
+    PIHP_CMH_Name = fct_relevel(
+      PIHP_CMH_Name,
+      c(
+        "Genesee Health System","Lapeer County CMH","Sanilac County CMH",
+        "St. Clair County CMH","Region 10"
+      )
+    )
+  ) %>%
+  plot_ly(
+    x = ~PIHP_CMH_Name,
+    y = ~pct,
+    color = I(chart_color)
+  ) %>%
+  add_bars(
+    hoverinfo = 'text',
+    text = ~paste0(
+      "At ", PIHP_CMH_Name,", ", numerator, " out of ",denominator," people (",pct,"%)<br>",
+      "with a BPOS are overdue to receive an updated BPOS."
+    )
+  ) %>%
+  layout(
+    title = "Compliance with Updated Plans of Service",
+    xaxis = list(title = "", tickangle = 45),
+    yaxis = list(
+      title = "% of total enrollees with overdue BPOS",
+      range = c(0, 100)
+    ),
+    margin = list(l = 60, r = 30, b = 150, t = 40, pad = 4)
+  )
+```
 
 ---
 
@@ -71,16 +237,15 @@ wsa %>%
       t(colSums(.[2:3])),
       pct = round(colSums(.[2])/colSums(.[3])*100,digits = 1)
     )
-  ) 
-
-  
+  ) %>%
+  select(PIHP_CMH_Name,denominator,numerator,pct)
 ```
 
 ```{r start_table}
 wsa_tbl %>%
   datatable(
     rownames = FALSE,
-    colnames = c('Organization','Overdue Enrollees','Total Enrollees','% of Enrollees Overdue'),
+    colnames = c('Organization','Total Enrollees','Overdue Enrollees','% of Enrollees Overdue'),
     extensions = c('Responsive','Buttons'),
     options = list(
       dom = 't',
@@ -98,6 +263,15 @@ wsa_tbl %>%
 <br>
 ```{r start_chart}
 wsa_tbl %>%
+  mutate(
+    PIHP_CMH_Name = fct_relevel(
+      PIHP_CMH_Name,
+      c(
+        "Genesee Health System","Lapeer County CMH","Sanilac County CMH",
+        "St. Clair County CMH","Region 10"
+      )
+    )
+  ) %>%
   plot_ly(
     x = ~PIHP_CMH_Name,
     y = ~pct,
@@ -122,7 +296,6 @@ wsa_tbl %>%
   
 
 ```
-
 
 ---
 
@@ -230,7 +403,8 @@ aba_summary <-
       t(colSums(.[2:3])),
       pct = round(colSums(.[2])/colSums(.[3])*100,digits = 1)
     )
-  ) 
+  ) %>%
+  select(PROVIDER_NAME,denominator,numerator,pct)
 
 ```
 
@@ -238,7 +412,7 @@ aba_summary <-
 aba_summary %>%
   datatable(
     rownames = FALSE,
-    colnames = c('Organization','Enrollees Non-Compliant','Total Enrollees with a Behavioral Plan of Service','% Non-Compliant'),
+    colnames = c('Organization','Total Enrollees with a Behavioral Plan of Service','Enrollees Non-Compliant','% Non-Compliant'),
     extensions = c('Responsive','Buttons'),
     options = list(
       dom = 't',
@@ -256,6 +430,15 @@ aba_summary %>%
 <br>
 ```{r roi_chart}
 aba_summary %>%
+  mutate(
+    PROVIDER_NAME = fct_relevel(
+      PROVIDER_NAME,
+      c(
+        "Genesee Health System","Lapeer County CMH","Sanilac County CMH",
+        "St. Clair County CMH","Region 10"
+      )
+    )
+  ) %>%
   plot_ly(
     x = ~PROVIDER_NAME,
     y = ~pct,
@@ -372,7 +555,8 @@ observe %>%
       t(colSums(.[2:3])),
       pct = round(colSums(.[2])/colSums(.[3])*100,digits = 1)
     )
-  ) 
+  ) %>%
+  select(PROVIDER_NAME,denominator,numerator,pct)
 
 ```
 
@@ -380,7 +564,7 @@ observe %>%
 observe_agg %>%
   datatable(
     rownames = FALSE,
-    colnames = c('Organization','Enrollees Non-Compliant','Total Enrollees with a Behavioral Plan of Service','% Non-Compliant'),
+    colnames = c('Organization','Total Enrollees with a Behavioral Plan of Service','Enrollees Non-Compliant','% Non-Compliant'),
     extensions = c('Responsive','Buttons'),
     options = list(
       dom = 't',
@@ -398,6 +582,15 @@ observe_agg %>%
 <br>
 ```{r observe_chart}
 observe_agg %>%
+  mutate(
+    PROVIDER_NAME = fct_relevel(
+      PROVIDER_NAME,
+      c(
+        "Genesee Health System","Lapeer County CMH","Sanilac County CMH",
+        "St. Clair County CMH","Region 10"
+      )
+    )
+  ) %>%
   plot_ly(
     x = ~PROVIDER_NAME,
     y = ~pct,
@@ -426,7 +619,7 @@ observe_agg %>%
 
 # Non-ABA Services for Enrollees Without a Behavioral Plan of Service
 
-For individuals who is autism waiver eligible and does not have a BPOS, what percent of have not received at least one non-ABA service within the previous 90 days?
+For enrollees who do not have a BPOS, what percent have not received at least one non-ABA service within the previous 90 days?
 
 ```{r waitlist_create}
 waitlist_svs <-
@@ -548,7 +741,8 @@ waitlist_summary <-
       t(colSums(.[2:3])),
       pct = round(colSums(.[2])/colSums(.[3])*100,digits = 1)
     )
-  ) 
+  ) %>%
+  select(PIHP_CMH_Name,denominator,numerator,pct)
 
 waitlist_person <-
   waitlist_all %>%
@@ -576,7 +770,7 @@ waitlist_person <-
 waitlist_summary %>%
   datatable(
     rownames = FALSE,
-    colnames = c('Organization','Enrollees Without Any Services','Total Enrollees without a Behavioral Plan of Service','% Without Services'),
+    colnames = c('Organization','Total Enrollees without a Behavioral Plan of Service','Enrollees Without Any Services','% Without Services'),
     extensions = c('Responsive','Buttons'),
     options = list(
       dom = 't',
@@ -596,6 +790,15 @@ waitlist_summary %>%
 <br>
 ```{r waitlist_chart}
 waitlist_summary %>%
+  mutate(
+    PIHP_CMH_Name = fct_relevel(
+      PIHP_CMH_Name,
+      c(
+        "Genesee Health System","Lapeer County CMH","Sanilac County CMH",
+        "St. Clair County CMH","Region 10"
+      )
+    )
+  ) %>%
   plot_ly(
     x = ~PIHP_CMH_Name,
     y = ~pct,
