@@ -6,22 +6,28 @@ if (!require("magrittr")) install.packages("magrittr")
 if (!require("lubridate")) install.packages("lubridate")
 if (!require("plotly")) install.packages("plotly")
 
-
 # Load packages
 library(tidyverse); library(stringr); library(magrittr); library(lubridate)
 
+# Define function to read and combine ####
+combineServices <- function(directory) {
+  ## 'directory' is a char vector of len 1 indicating location of CSV files
+  files <- list.files(directory,full.names = TRUE) # make list of full file names
+  n <- length(files)
+  # Create empty data frame
+  df <- tibble() 
+  # Loop through files, binding them together
+  for (i in 1:n) {
+    x <- read_csv(files[i], skip = 7)
+    df <- rbind(df, x)
+  } 
+  df
+}
+
 # Read in .csv files as dataframes
-csv_path <- "C:/Users/joshh/OneDrive - TBD Solutions LLC/files/Region10/Autism/"
-genesee <- read_csv(paste0(csv_path,"Autism.Genesse.csv"), skip = 7)
-lapeer <- read_csv(paste0(csv_path,"Autism.Lapeer.csv"), skip = 7)
-sanilac <- read_csv(paste0(csv_path,"Autism.Sanilac.csv"), skip = 7)
-stclair <- read_csv(paste0(csv_path,"Autism.StClair.csv"), skip = 7)
-
+directory <- "C:/Users/joshh/OneDrive - TBD Solutions LLC/files/Region10/Autism/services"
 # Bind separate CMH dataframes together
-svs <- genesee %>% bind_rows(lapeer,sanilac,stclair)
-
-# Remove separate files from environment
-rm(csv_path); rm(genesee); rm(lapeer); rm(sanilac); rm(stclair)
+svs <- combineServices(directory)
 
 # Remove cols where all values are NA
 svs <- Filter(function(x)!all(is.na(x)), svs)
@@ -61,7 +67,7 @@ svs %>%
   ) %>%
   # Change numeric ID vars to characters
   mutate_at(
-    .cols = vars(PRV_ID,CON_ID,CLM_ID:PRIM_INS_ID),
+    .vars = vars(PRV_ID,CON_ID,CLM_ID:PRIM_INS_ID),
     .funs = funs(as.character)
   ) %>%
   # Change all character columns to factors
@@ -73,7 +79,7 @@ svs %>%
   ) %>%
   # Transform Y/N responses into logical vars
   mutate_at(
-    .cols = vars(HAB_WAIVER:HMP_BUCKET),
+    .vars = vars(HAB_WAIVER:HMP_BUCKET),
     .funs = funs(. == "Y")
   ) 
 

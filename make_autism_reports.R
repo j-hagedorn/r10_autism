@@ -157,8 +157,6 @@ library(tidyverse); library(magrittr); library(stringr);library(lubridate);libra
   
   write_feather(wsa_ipos,"data/wsa_ipos.feather")
 
-
-
 # Run reports ####
 
   # Render reports per CMH (if this is run last, the data will remain filtered in the environment)
