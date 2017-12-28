@@ -320,7 +320,7 @@ ipos_start <-
   filter(Status == "Open" & Currently_Inactive == F) %>% 
   select(MEDICAID_ID = ID,IPOS_Start_Date)
 
-last_90 <- as.Date(max(svs$FROM_DATE) - 90)
+last_90 <- as.Date(max(svs$FROM_DATE, na.rm = T) - 90)
 
 aba_svs <-
 svs %>%
