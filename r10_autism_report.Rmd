@@ -253,7 +253,7 @@ wsa %>%
   select(Case_ID,PIHP_CMH_Name,Eligibility_Date) %>%
   mutate(
     Eligibility_Date = ymd(Eligibility_Date),
-    days_wo_bpos = as.numeric(max(svs$FROM_DATE) - as.Date(Eligibility_Date))
+    days_wo_bpos = as.numeric(max(svs$FROM_DATE, na.rm = T) - as.Date(Eligibility_Date))
   ) %>%
   datatable(
     rownames = FALSE,
