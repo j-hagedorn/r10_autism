@@ -34,7 +34,7 @@ wsa_ipos <- read_feather(paste0(csv_path,"wsa_ipos.feather"))
 
 ```
 
-<h4>This *summary* report was generated for Region 10 PIHP on `r Sys.Date()` using data from `r min(svs$FROM_DATE)` - `r max(svs$FROM_DATE)`</h4>
+<h4>This *summary* report was generated for Region 10 PIHP on `r Sys.Date()` using data from `r min(svs$FROM_DATE, na.rm = T)` - `r max(svs$FROM_DATE, na.rm = T)`</h4>
 
 *Please note that the data in this report may not reflect all services that enrollees received from the Autism Benefit.  Specifically, services may not appear for more recent periods if claims have not yet been submitted.*
 

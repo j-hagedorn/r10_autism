@@ -36,7 +36,7 @@ wsa_ipos %<>% filter(PIHP_CHM == params$cmh) %>% droplevels()
 ```
 
 
-<h4>This *full detail* report was generated for `r paste0(params$cmh)` on `r Sys.Date()` using data from `r min(svs$FROM_DATE)` - `r max(svs$FROM_DATE)`</h4>
+<h4>This *full detail* report was generated for `r paste0(params$cmh)` on `r Sys.Date()` using data from `r min(svs$FROM_DATE, na.rm = T)` - `r max(svs$FROM_DATE, na.rm = T)`</h4>
 
 
 *Please note that the data in this report may not reflect all services that enrollees received from the Autism Benefit.  Specifically, services may not appear for more recent periods if claims have not yet been submitted.*
