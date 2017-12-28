@@ -28,6 +28,16 @@ wsa %<>%
       Has_Past_Inactive
     ),
     .funs = funs(. == "Yes")
+  ) %>%
+  # Recode CMH names for consistent reference
+  mutate(
+    PIHP_CMH_Name = recode(
+      PIHP_CMH_Name,
+      `Region 10 - Genesee` = "Genesee Health System",
+      `Region 10 - Lapeer` = "Lapeer County CMH",
+      `Region 10 - St. Clair` = "St. Clair County CMH",
+      `Region 10 - Sanilac` = "Sanilac County CMH"
+    )
   )
   
 # If closed and opened, client is given a new 'Case ID' 
@@ -55,4 +65,13 @@ wsa_ipos %<>%
   mutate_at(
     .cols = vars(IPOS_Exists),
     .funs = funs(. == "Yes")
+  ) %>%
+  mutate(
+    PIHP_CHM = recode(
+      PIHP_CHM,
+      `Region 10 - Genesee` = "Genesee Health System",
+      `Region 10 - Lapeer` = "Lapeer County CMH",
+      `Region 10 - St. Clair` = "St. Clair County CMH",
+      `Region 10 - Sanilac` = "Sanilac County CMH"
+    )
   )
