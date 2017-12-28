@@ -255,6 +255,7 @@ wsa %>%
     Eligibility_Date = ymd(Eligibility_Date),
     days_wo_bpos = as.numeric(max(svs$FROM_DATE, na.rm = T) - as.Date(Eligibility_Date))
   ) %>%
+  filter(days_wo_bpos > 0) %>%
   datatable(
     rownames = FALSE,
     colnames = c('WSA ID','Organization','Eligibility Date','Days without BPOS'),
