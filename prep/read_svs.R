@@ -81,5 +81,15 @@ svs %>%
   mutate_at(
     .vars = vars(HAB_WAIVER:HMP_BUCKET),
     .funs = funs(. == "Y")
-  ) 
-
+  ) %>%
+  # Recode CMH names for consistent reference 
+  mutate(
+    PROVIDER_NAME = recode(
+      PROVIDER_NAME,
+      `6-Genesee Health System` = "Genesee Health System",
+      `2-Lapeer County Community Mental Health` = "Lapeer County CMH",
+      `3-St. Clair County Community Mental Health` = "St. Clair County CMH",
+      `4-Sanilac County Community Mental Health` = "Sanilac County CMH"
+    )
+  )
+  
