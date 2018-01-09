@@ -194,7 +194,7 @@ wsa %>%
 
 ---
 
-# Overdue Service Start
+# Enrollees Without Behavioral Plan of Service
 
 Enrollees approved for ABA and are awaiting the development of an ABA behavior treatment plan to begin services.
 
@@ -227,7 +227,7 @@ wsa %>%
 wsa_tbl %>%
   datatable(
     rownames = FALSE,
-    colnames = c('Organization','Total Enrollees','Overdue Enrollees','% of Enrollees Overdue'),
+    colnames = c('Organization','Total Enrollees','Total Enrollees without a BPOS','% of Enrollees without BPOS'),
     extensions = c('Responsive','Buttons'),
     options = list(
       dom = 't',
@@ -253,7 +253,7 @@ wsa %>%
   select(Case_ID,PIHP_CMH_Name,Eligibility_Date) %>%
   mutate(
     Eligibility_Date = ymd(Eligibility_Date),
-    days_wo_bpos = as.numeric(max(svs$FROM_DATE, na.rm = T) - as.Date(Eligibility_Date))
+    days_wo_bpos = as.numeric(today() - as.Date(Eligibility_Date))
   ) %>%
   filter(days_wo_bpos > 0) %>%
   datatable(
@@ -555,7 +555,7 @@ observe %>%
 observe_agg %>%
   datatable(
     rownames = FALSE,
-    colnames = c('Organization','Total Enrollees with a Behavioral Plan of Service','Enrollees Non-Compliant','% Non-Compliant'),
+    colnames = c('Organization','Enrollees with 10+ Hrs of ABA Svs','Enrollees Non-Compliant','% Non-Compliant'),
     extensions = c('Responsive','Buttons'),
     options = list(
       dom = 't',
@@ -786,6 +786,8 @@ waitlist_svs %>%
 
 waitlist_summary <-
   waitlist_last90 %>%
+  group_by(Case_ID,PIHP_CMH_Name) %>%
+  summarize(encounters = sum(encounters)) %>%
   mutate(
     has_enc = encounters >= 1
   ) %>%
@@ -824,7 +826,7 @@ waitlist_person <-
   ) %>%
   mutate(
     # Most recent date in services data pulled
-    max_date = max(svs$FROM_DATE),
+    max_date = max(svs$FROM_DATE, na.rm = T),
     elig_interval = as.numeric(max_date - (Eligibility_Date + 90)),
     svs_interval = as.numeric(last - first),
     pct_days_svd = round(svs_interval/elig_interval * 100, digits = 1),
@@ -839,7 +841,7 @@ For enrollees who do not have a BPOS, what percent have not received at least on
 waitlist_summary %>%
   datatable(
     rownames = FALSE,
-    colnames = c('Organization','Total Enrollees without a Behavioral Plan of Service','Enrollees Without Any Services','% Without Services'),
+    colnames = c('Organization','Total Enrollees without a BPOS','Enrollees Without Any Services','% Without Services'),
     extensions = c('Responsive','Buttons'),
     options = list(
       dom = 't',
@@ -918,6 +920,7 @@ The table below includes the following information:
 
 dt <- t3 %>%
   filter(autism_waiver_svs == F) %>%
+  filter(elig_interval >= 0) %>%
   select(-autism_waiver_svs, -pct_days_svd) %>%
   datatable(
     data.table(),
@@ -953,15 +956,15 @@ These individuals are shown in the table below:
 ```{r}
 dt <- t3 %>%
   filter(autism_waiver_svs == T) %>%
-  select(-autism_waiver_svs) %>%
+  filter(elig_interval >= 0) %>%
+  select(-autism_waiver_svs, -pct_days_svd) %>%
   datatable(
     data.table(),
     caption = "ABA-inclusive Services provided to Enrollees Without a Behavioral Plan of Service",
     rownames = FALSE,
     colnames = c('WSA ID','Encounters per month',
                  'Organization','Services provided',
-                 'Days on waitlist','Percent days covered',
-                 'Total Encounters'),
+                 'Days on waitlist','Total Encounters'),
     extensions = c('Responsive','Buttons'),
     options = list(
       columnDefs = cd,
@@ -1010,7 +1013,7 @@ dt
 
 **Range of Intensity:** The hours of ABA treatment provided; within 25% +/- of prescribed hours meets the standard.
 
-**Ratio of Observation to Treatment:** The result of dividing the number of hours of ‘observation of ABA Services’ by ‘hours of treatment’. A ratio value of greater than or equal to 0.1 (1 hour of observation for every 10 hours of treatment) meets the standard.
+**Ratio of Observation to Treatment:** The result of dividing the number of hours of 'observation of ABA Services' by 'hours of treatment'. A ratio value of greater than or equal to 0.1 (1 hour of observation for every 10 hours of treatment) meets the standard.  Note that this metric only includes enrollees with a BPOS who received >= 10 hours of treatment during the reporting period.
 
 **Services Provided:** A list of services (i.e. the descriptions which accompany HCPCS codes) that the enrollee has received. 
 

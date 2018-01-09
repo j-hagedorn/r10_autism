@@ -181,7 +181,7 @@ wsa %>%
 
 ---
 
-# Overdue Service Start
+# Enrollees Without Behavioral Plan of Service
 
 Enrollees approved for ABA and are awaiting the development of an ABA behavior treatment plan to begin services.
 
@@ -205,7 +205,7 @@ wsa %>%
 wsa_tbl %>%
   datatable(
     rownames = FALSE,
-    colnames = c('Organization','Total Enrollees','Overdue Enrollees','% of Enrollees Overdue'),
+    colnames = c('Organization','Total Enrollees','Total Enrollees without a BPOS','% of Enrollees without BPOS'),
     extensions = c('Responsive','Buttons'),
     options = list(
       dom = 't',
@@ -515,7 +515,7 @@ observe %>%
 observe_agg %>%
   datatable(
     rownames = FALSE,
-    colnames = c('Organization','Total Enrollees with a Behavioral Plan of Service','Enrollees Non-Compliant','% Non-Compliant'),
+    colnames = c('Organization','Enrollees with 10+ Hrs of ABA Svs','Enrollees Non-Compliant','% Non-Compliant'),
     extensions = c('Responsive','Buttons'),
     options = list(
       dom = 't',
@@ -952,7 +952,7 @@ dt
 
 **Range of Intensity:** The hours of ABA treatment provided; within 25% +/- of prescribed hours meets the standard.
 
-**Ratio of Observation to Treatment:** The result of dividing the number of hours of ‘observation of ABA Services’ by ‘hours of treatment’. A ratio value of greater than or equal to 0.1 (1 hour of observation for every 10 hours of treatment) meets the standard.
+**Ratio of Observation to Treatment:** The result of dividing the number of hours of 'observation of ABA Services' by 'hours of treatment'. A ratio value of greater than or equal to 0.1 (1 hour of observation for every 10 hours of treatment) meets the standard.  Note that this metric only includes enrollees with a BPOS who received >= 10 hours of treatment during the reporting period.
 
 **Services Provided:** A list of services (i.e. the descriptions which accompany HCPCS codes) that the enrollee has received. 
 
