@@ -131,14 +131,17 @@ reeval_tbl %>%
 ```{r bpos_create}
 bpos_tbl <-
 wsa %>%
-  filter(Status == "Open" & IPOSExists == T) %>%
+  filter(
+    Status == "Open" 
+    & Currently_Inactive == F
+    & IPOSExists == T) %>%
   mutate(
     past_due = IPOS_Due_Date < today()
   ) %>%
   group_by(PIHP_CMH_Name) %>%
   summarize(
     numerator = sum(past_due, na.rm = T),
-    denominator = n()
+    denominator = n_distinct(Case_ID)
   ) %>%
   mutate(
     pct = round(numerator / denominator * 100, digits = 1)
@@ -212,22 +215,27 @@ bpos_tbl %>%
 
 ---
 
-# Overdue Service Start
+# Enrollees Without Behavioral Plan of Service
 
 Enrollees approved for ABA and are awaiting the development of an ABA behavior treatment plan to begin services.
 
 ```{r start_create}
 wsa_tbl <-
 wsa %>%
-  filter(Status == "Open") %>%
+  filter(
+    Status == "Open" 
+    & Currently_Inactive == F
+  ) %>%
   group_by(PIHP_CMH_Name) %>%
   summarize(
-    numerator = n() - sum(IPOSExists, na.rm = T),
-    denominator = n()
+    ipos_exists = sum(IPOSExists, na.rm = T),
+    denominator = n_distinct(Case_ID)
   ) %>%
   mutate(
+    numerator = denominator - ipos_exists,
     pct = round(numerator / denominator * 100, digits = 1)
   ) %>%
+  select(-ipos_exists) %>%
   arrange(as.character(PIHP_CMH_Name)) %>%
   # Add subtotal line for PIHP
   rbind(
@@ -245,7 +253,7 @@ wsa %>%
 wsa_tbl %>%
   datatable(
     rownames = FALSE,
-    colnames = c('Organization','Total Enrollees','Overdue Enrollees','% of Enrollees Overdue'),
+    colnames = c('Organization','Total Enrollees','Total Enrollees without a BPOS','% of Enrollees without BPOS'),
     extensions = c('Responsive','Buttons'),
     options = list(
       dom = 't',
@@ -317,7 +325,8 @@ aba_rx_hrs <- wsa_ipos %>% select(MEDICAID_ID = Beneficiary_ID,Case_ID,ABA_Hours
 
 ipos_start <- 
   wsa %>% 
-  filter(Status == "Open" & Currently_Inactive == F) %>% 
+  filter(Status == "Open") %>%
+  filter(Currently_Inactive == F) %>%
   select(MEDICAID_ID = ID,IPOS_Start_Date)
 
 last_90 <- as.Date(max(svs$FROM_DATE, na.rm = T) - 90)
@@ -330,6 +339,11 @@ svs %>%
   ) %>%
   # Now remove observation codes
   filter(!CPT_CD %in% c("S5108","0368T","0369T")) %>%
+  # Only include services if they are in most recent 90 days of dataset
+  filter(
+    FROM_DATE >= last_90
+    | is.na(FROM_DATE) == T
+  ) %>%
   droplevels() %>%
   mutate(
     # Recode unit type as numeric conversion factor
@@ -350,16 +364,31 @@ svs %>%
   select(PROVIDER_NAME,MEDICAID_ID,CPT_CD:FROM_DATE,week,UNITS,hrs) 
 
 aba_summary <-
-  aba_svs %>%
+  # Start with WSA
+  wsa %>%
+  filter(Status == "Open") %>%
+  filter(Currently_Inactive == F) %>%
+  filter(IPOSExists == T) %>%
+  select(
+    MEDICAID_ID = ID,
+    PIHP_CMH_Name,
+    Case_ID
+  ) %>%
+  # Join with IPOS start date from WSA
+  left_join(ipos_start, by = "MEDICAID_ID") %>%
+  # Join to ABA services
+  left_join(aba_svs, by = "MEDICAID_ID") %>%
   # Get prescribed ABA hours from WSA IPOS
   left_join(aba_rx_hrs, by = "MEDICAID_ID") %>%
-  # Get IPOS start date from WSA
-  left_join(ipos_start, by = "MEDICAID_ID") %>%
+  # Remove Case IDs which are duplicated in IPOS dataset
+  rename(Case_ID = Case_ID.x) %>%
+  select(-Case_ID.y) %>%
   # Only include services if they occur after the IPOS Start Date
-  filter(FROM_DATE >= IPOS_Start_Date) %>%
-  # Only include services if they are in most recent 90 days of dataset
-  filter(FROM_DATE >= last_90) %>%
-  group_by(Case_ID,PROVIDER_NAME,week) %>%
+  filter(
+    FROM_DATE >= IPOS_Start_Date
+    | is.na(FROM_DATE) == T
+  ) %>%
+  group_by(Case_ID,PIHP_CMH_Name,week) %>%
   summarize(
     hrs = sum(hrs, na.rm = T),
     ABA_Hours = max(ABA_Hours)
@@ -369,14 +398,13 @@ aba_summary <-
     # Negative values indicate hours less than goal
     diff = hrs - ABA_Hours,
     # Calculate % of prescribed hours received
-    # Tag Compliant and Non-Compliant weeks
-   
     pct_all = round(sum(hrs) / sum(ABA_Hours) * 100, digits = 1),
+    # Tag Compliant and Non-Compliant weeks
     in_range_all = ifelse(between(pct_all,75,125),T,F)
   ) %>%
   ungroup() %>%
-  group_by(Case_ID,PROVIDER_NAME) %>%
-  summarise(
+  group_by(Case_ID,PIHP_CMH_Name) %>%
+  summarize(
     hrs = sum(hrs, na.rm = T),
     ABA_Hours = sum(ABA_Hours, na.rm = T)
   ) %>%
@@ -384,27 +412,27 @@ aba_summary <-
     pct = round(hrs / ABA_Hours * 100, digits = 1),
     in_range = ifelse(between(pct,75,125),T,F)
   ) %>%
-  group_by(PROVIDER_NAME) %>%
-  summarise(
+  group_by(PIHP_CMH_Name) %>%
+  summarize(
     in_range =  sum(in_range),
-    denominator = n()
+    denominator = n_distinct(Case_ID)
   ) %>%
   mutate(
     numerator = denominator - in_range,
     pct = round(numerator/denominator * 100, digits = 1)
   ) %>% 
-  select(PROVIDER_NAME,numerator,denominator,pct) %>%
-  arrange(as.character(PROVIDER_NAME)) %>%
+  select(PIHP_CMH_Name,numerator,denominator,pct) %>%
+  arrange(as.character(PIHP_CMH_Name)) %>%
   # Add subtotal line for PIHP
   rbind(
     ., 
     data.frame(
-      PROVIDER_NAME = "Region 10", 
+      PIHP_CMH_Name = "Region 10", 
       t(colSums(.[2:3])),
       pct = round(colSums(.[2])/colSums(.[3])*100,digits = 1)
     )
   ) %>%
-  select(PROVIDER_NAME,denominator,numerator,pct)
+  select(PIHP_CMH_Name,denominator,numerator,pct)
 
 ```
 
@@ -412,7 +440,7 @@ aba_summary <-
 aba_summary %>%
   datatable(
     rownames = FALSE,
-    colnames = c('Organization','Total Enrollees with a Behavioral Plan of Service','Enrollees Non-Compliant','% Non-Compliant'),
+    colnames = c('Organization','Total Enrollees with BPOS','Enrollees Non-Compliant','% Non-Compliant'),
     extensions = c('Responsive','Buttons'),
     options = list(
       dom = 't',
@@ -431,8 +459,8 @@ aba_summary %>%
 ```{r roi_chart}
 aba_summary %>%
   mutate(
-    PROVIDER_NAME = fct_relevel(
-      PROVIDER_NAME,
+    PIHP_CMH_Name = fct_relevel(
+      PIHP_CMH_Name,
       c(
         "Genesee Health System","Lapeer County CMH","Sanilac County CMH",
         "St. Clair County CMH","Region 10"
@@ -440,14 +468,14 @@ aba_summary %>%
     )
   ) %>%
   plot_ly(
-    x = ~PROVIDER_NAME,
+    x = ~PIHP_CMH_Name,
     y = ~pct,
     color = I(chart_color)
   ) %>%
   add_bars(
     hoverinfo = 'text',
     text = ~paste0(
-      "At ", PROVIDER_NAME,", ", numerator, " out of ",denominator," people (",pct,"%)<br>",
+      "At ", PIHP_CMH_Name,", ", numerator, " out of ",denominator," people (",pct,"%)<br>",
       "did not receive ABA services at the required intensity."
     )
   ) %>%
@@ -564,7 +592,7 @@ observe %>%
 observe_agg %>%
   datatable(
     rownames = FALSE,
-    colnames = c('Organization','Total Enrollees with a Behavioral Plan of Service','Enrollees Non-Compliant','% Non-Compliant'),
+    colnames = c('Organization','Enrollees with 10+ Hrs of ABA Svs','Enrollees Non-Compliant','% Non-Compliant'),
     extensions = c('Responsive','Buttons'),
     options = list(
       dom = 't',
@@ -617,213 +645,6 @@ observe_agg %>%
 
 ---
 
-# Non-ABA Services for Enrollees Without a Behavioral Plan of Service
-
-For enrollees who do not have a BPOS, what percent have not received at least one non-ABA service within the previous 90 days?
-
-```{r waitlist_create}
-waitlist_svs <-
-  wsa %>%
-  # Filter individuals who are on waitlist
-  filter(
-    Status == "Open"
-    & IPOSExists == F
-    & is.na(Eligibility_Date) == F
-  ) %>%
-  select(ID,Case_ID,PIHP_CMH_Name,Referral_Date:Eligibility_End_Date) %>%
-  left_join(svs, by = c("ID" = "MEDICAID_ID")) %>%
-  filter(
-    # Only include services occurring after eligibility for autism
-    FROM_DATE > as.Date(Eligibility_Date)     
-    # or if there is no service date (to keep people who didn't receive svs)
-    | is.na(FROM_DATE) == T 
-  ) 
-
-waitlist_last90 <-
-  waitlist_svs %>%
-  # Only include services if they are in most recent 90 days of dataset
-  filter(FROM_DATE >= last_90 & is.na(AUTISM_SRV)) %>%
-  group_by(Case_ID,PIHP_CMH_Name,CPT_CD,SERVICE_DESC,UNIT_TYPE,AUTISM_SRV,Eligibility_Date) %>%
-  # Convert units to a common period
-  mutate(
-    # Recode unit type as numeric conversion factor
-    hr_conv = recode(
-      as.character(UNIT_TYPE),
-      `15 Minutes` = '0.25', 
-      `30 Minutes` = '0.5',
-      `Hour` = '1', 
-      `Up to 15 min` = '0.25',
-      `Encounter` = 'NA'
-    ),
-    svs_conv = recode(
-      as.character(SERVICE_DESC),
-      `Psychotherapy, 60 min` = 1, 
-      `Psychotherapy, 45 min` = 0.75,
-      `Psychotherapy, 30 min` = 0.5
-    ),
-    hr_conv = ifelse(is.na(svs_conv) == F,svs_conv,as.numeric(hr_conv)),
-    # Calculate hours
-    hrs = UNITS * hr_conv
-  ) %>%
-  # What is the first and last date of each service?
-  mutate(
-    first = min(FROM_DATE),
-    last = max(FROM_DATE)
-  ) %>%
-  # What is the number of units received?
-  summarize(
-    encounters = n(),
-    units = sum(UNITS, na.rm = T),
-    hrs = sum(hrs, na.rm = T),
-    first = min(FROM_DATE),
-    last = max(FROM_DATE)
-  ) 
-
-waitlist_all <-
-waitlist_svs %>%
-  group_by(Case_ID,PIHP_CMH_Name,CPT_CD,SERVICE_DESC,UNIT_TYPE,AUTISM_SRV,Eligibility_Date) %>%
-  # Convert units to a common period
-  mutate(
-    # Recode unit type as numeric conversion factor
-    hr_conv = recode(
-      as.character(UNIT_TYPE),
-      `15 Minutes` = '0.25', 
-      `30 Minutes` = '0.5',
-      `Hour` = '1', 
-      `Up to 15 min` = '0.25',
-      `Encounter` = 'NA'
-    ),
-    svs_conv = recode(
-      as.character(SERVICE_DESC),
-      `Psychotherapy, 60 min` = 1, 
-      `Psychotherapy, 45 min` = 0.75,
-      `Psychotherapy, 30 min` = 0.5
-    ),
-    hr_conv = ifelse(is.na(svs_conv) == F,svs_conv,as.numeric(hr_conv)),
-    # Calculate hours
-    hrs = UNITS * hr_conv
-  ) %>%
-  # What is the first and last date of each service?
-  mutate(
-    first = min(FROM_DATE),
-    last = max(FROM_DATE)
-  ) %>%
-  # What is the number of units received?
-  summarize(
-    encounters = n(),
-    units = sum(UNITS, na.rm = T),
-    hrs = sum(hrs, na.rm = T),
-    first = min(FROM_DATE),
-    last = max(FROM_DATE)
-  ) 
-
-waitlist_summary <-
-  waitlist_last90 %>%
-  mutate(
-    has_enc = encounters >= 1
-  ) %>%
-  group_by(PIHP_CMH_Name) %>%
-  summarize(
-    has_enc = sum(has_enc, na.rm = T),
-    denominator = n()
-  ) %>%
-  mutate(
-    numerator = denominator - has_enc,
-    pct = round(numerator / denominator * 100, digits = 1)
-  ) %>% 
-  select(PIHP_CMH_Name,numerator,denominator,pct) %>%
-  arrange(as.character(PIHP_CMH_Name)) %>%
-  # Add subtotal line for PIHP
-  rbind(
-    ., 
-    data.frame(
-      PIHP_CMH_Name = "Region 10", 
-      t(colSums(.[2:3])),
-      pct = round(colSums(.[2])/colSums(.[3])*100,digits = 1)
-    )
-  ) %>%
-  select(PIHP_CMH_Name,denominator,numerator,pct)
-
-waitlist_person <-
-  waitlist_all %>%
-  group_by(Case_ID) %>%
-  summarize(
-    first = min(first),
-    last = max(last),
-    Eligibility_Date = as.Date(max(Eligibility_Date)),
-    svs_list = paste(SERVICE_DESC, collapse = ', '),
-    encounters = sum(encounters),
-    autism_waiver_svs = sum(AUTISM_SRV, na.rm = T)
-  ) %>%
-  mutate(
-    # Most recent date in services data pulled
-    max_date = max(svs$FROM_DATE),
-    elig_interval = as.numeric(max_date - (Eligibility_Date + 90)),
-    svs_interval = as.numeric(last - first),
-    pct_days_svd = round(svs_interval/elig_interval * 100, digits = 1),
-    autism_waiver_svs = autism_waiver_svs > 0
-  )
-
-```
-
-```{r waitlist_table}
-waitlist_summary %>%
-  datatable(
-    rownames = FALSE,
-    colnames = c('Organization','Total Enrollees without a Behavioral Plan of Service','Enrollees Without Any Services','% Without Services'),
-    extensions = c('Responsive','Buttons'),
-    options = list(
-      dom = 't',
-      buttons = c('colvis')
-    )
-  ) %>%
-  formatStyle(
-    'pct',
-    background = styleColorBar(c(0,100), '#fc8d59'),
-    backgroundSize = '100% 90%',
-    backgroundRepeat = 'no-repeat',
-    backgroundPosition = 'center'
-  )
-
-
-```
-<br>
-```{r waitlist_chart}
-waitlist_summary %>%
-  mutate(
-    PIHP_CMH_Name = fct_relevel(
-      PIHP_CMH_Name,
-      c(
-        "Genesee Health System","Lapeer County CMH","Sanilac County CMH",
-        "St. Clair County CMH","Region 10"
-      )
-    )
-  ) %>%
-  plot_ly(
-    x = ~PIHP_CMH_Name,
-    y = ~pct,
-    color = I(chart_color)
-  ) %>%
-  add_bars(
-    hoverinfo = 'text',
-    text = ~paste0(
-      "At ", PIHP_CMH_Name,", ", numerator, " out of ",denominator," people (",pct,"%)<br>",
-      "without a BPOS did not receive any non-ABA services."
-    )
-  ) %>%
-  layout(
-    title = "Non-ABA Services for Enrollees without BPOS",
-    xaxis = list(title = "", tickangle = 45),
-    yaxis = list(
-      title = "% without interim services",
-      range = c(0, 100)
-    ),
-    margin = list(l = 60, r = 30, b = 150, t = 40, pad = 4)
-  )
-```
-
----
-
 # Glossary
 
 **ABA Services:** Services provided by the CMHSP, or contracted ABA provider, which include the S5108, H2019, 0364T, 0365T, 0366T, 0367T, 0372T, 0373T, 0374T, 0368T, and 0369T service codes reported with a U5 modifier. (Note: U5 modifier must be reported on all encounters covered by the EPSDT Autism Benefit).
@@ -856,7 +677,7 @@ waitlist_summary %>%
 
 **Range of Intensity:** The hours of ABA treatment provided; within 25% +/- of prescribed hours meets the standard.
 
-**Ratio of Observation to Treatment:** The result of dividing the number of hours of ‘observation of ABA Services’ by ‘hours of treatment’. A ratio value of greater than or equal to 0.1 (1 hour of observation for every 10 hours of treatment) meets the standard.
+**Ratio of Observation to Treatment:** The result of dividing the number of hours of 'observation of ABA Services' by 'hours of treatment'. A ratio value of greater than or equal to 0.1 (1 hour of observation for every 10 hours of treatment) meets the standard.  Note that this metric only includes enrollees with a BPOS who received >= 10 hours of treatment during the reporting period.
 
 **Services Provided:** A list of services (i.e. the descriptions which accompany HCPCS codes) that the enrollee has received. 
 
