@@ -725,101 +725,74 @@ family_svs %>%
 # Non-ABA Services Received by Enrollees Without a Behavioral Plan of Service
 
 ```{r waitlist_create}
+
+elig_date <- wsa %>% select(Case_ID,MEDICAID_ID = ID,PIHP_CMH_Name,Eligibility_Date)
+
 waitlist_svs <-
+  svs %>%
+  # Exclude services marked as U5
+  filter(is.na(AUTISM_SRV)) %>%
+  left_join(elig_date, by = "MEDICAID_ID") %>%
+  filter(
+    # Only include services occurring after eligibility for autism
+    FROM_DATE > as.Date(Eligibility_Date)     
+    # or if there is no service date (to keep people who didn't receive svs)
+    | is.na(FROM_DATE) == T 
+  ) %>%
+  mutate(last_90_log = FROM_DATE >= last_90) %>%
+  group_by(Case_ID,PIHP_CMH_Name,CPT_CD,SERVICE_DESC,UNIT_TYPE,AUTISM_SRV,Eligibility_Date,last_90_log) %>%
+  # Convert units to a common period
+  mutate(
+    # Recode unit type as numeric conversion factor
+    hr_conv = recode(
+      as.character(UNIT_TYPE),
+      `15 Minutes` = '0.25', 
+      `30 Minutes` = '0.5',
+      `Hour` = '1', 
+      `Up to 15 min` = '0.25',
+      `Encounter` = 'NA'
+    ),
+    svs_conv = recode(
+      as.character(SERVICE_DESC),
+      `Psychotherapy, 60 min` = 1, 
+      `Psychotherapy, 45 min` = 0.75,
+      `Psychotherapy, 30 min` = 0.5
+    ),
+    hr_conv = ifelse(is.na(svs_conv) == F,svs_conv,as.numeric(hr_conv)),
+    # Calculate hours
+    hrs = UNITS * hr_conv
+  ) %>%
+  # What is the first and last date of each service?
+  mutate(
+    first = min(FROM_DATE),
+    last = max(FROM_DATE)
+  ) %>%
+  # What is the number of units received?
+  summarize(
+    encounters = n(),
+    units = sum(UNITS, na.rm = T),
+    hrs = sum(hrs, na.rm = T),
+    first = min(FROM_DATE),
+    last = max(FROM_DATE)
+  ) 
+
+
+waitlist_last90 <-
+  waitlist_svs %>%
+  # Only include services if they are in most recent 90 days of dataset
+  filter(last_90_log == T) %>%
+  ungroup() %>%
+  select(-PIHP_CMH_Name)
+  
+
+waitlist_summary <-
   wsa %>%
   # Filter individuals who are on waitlist
   filter(Status == "Open") %>%
   filter(Currently_Inactive == F) %>%
   filter(is.na(Eligibility_Date) == F) %>%
   select(ID,Case_ID,PIHP_CMH_Name,Referral_Date:Eligibility_End_Date) %>%
-  left_join(svs, by = c("ID" = "MEDICAID_ID")) %>%
-  filter(
-    # Only include services occurring after eligibility for autism
-    FROM_DATE > as.Date(Eligibility_Date)     
-    # or if there is no service date (to keep people who didn't receive svs)
-    | is.na(FROM_DATE) == T 
-  ) 
-
-waitlist_last90 <-
-  waitlist_svs %>%
-  # Only include services if they are in most recent 90 days of dataset
-  filter(FROM_DATE >= last_90 & is.na(AUTISM_SRV)) %>%
-  group_by(Case_ID,PIHP_CMH_Name,CPT_CD,SERVICE_DESC,UNIT_TYPE,AUTISM_SRV,Eligibility_Date) %>%
-  # Convert units to a common period
-  mutate(
-    # Recode unit type as numeric conversion factor
-    hr_conv = recode(
-      as.character(UNIT_TYPE),
-      `15 Minutes` = '0.25', 
-      `30 Minutes` = '0.5',
-      `Hour` = '1', 
-      `Up to 15 min` = '0.25',
-      `Encounter` = 'NA'
-    ),
-    svs_conv = recode(
-      as.character(SERVICE_DESC),
-      `Psychotherapy, 60 min` = 1, 
-      `Psychotherapy, 45 min` = 0.75,
-      `Psychotherapy, 30 min` = 0.5
-    ),
-    hr_conv = ifelse(is.na(svs_conv) == F,svs_conv,as.numeric(hr_conv)),
-    # Calculate hours
-    hrs = UNITS * hr_conv
-  ) %>%
-  # What is the first and last date of each service?
-  mutate(
-    first = min(FROM_DATE),
-    last = max(FROM_DATE)
-  ) %>%
-  # What is the number of units received?
-  summarize(
-    encounters = n(),
-    units = sum(UNITS, na.rm = T),
-    hrs = sum(hrs, na.rm = T),
-    first = min(FROM_DATE),
-    last = max(FROM_DATE)
-  ) 
-
-waitlist_all <-
-waitlist_svs %>%
-  group_by(Case_ID,PIHP_CMH_Name,CPT_CD,SERVICE_DESC,UNIT_TYPE,AUTISM_SRV,Eligibility_Date) %>%
-  # Convert units to a common period
-  mutate(
-    # Recode unit type as numeric conversion factor
-    hr_conv = recode(
-      as.character(UNIT_TYPE),
-      `15 Minutes` = '0.25', 
-      `30 Minutes` = '0.5',
-      `Hour` = '1', 
-      `Up to 15 min` = '0.25',
-      `Encounter` = 'NA'
-    ),
-    svs_conv = recode(
-      as.character(SERVICE_DESC),
-      `Psychotherapy, 60 min` = 1, 
-      `Psychotherapy, 45 min` = 0.75,
-      `Psychotherapy, 30 min` = 0.5
-    ),
-    hr_conv = ifelse(is.na(svs_conv) == F,svs_conv,as.numeric(hr_conv)),
-    # Calculate hours
-    hrs = UNITS * hr_conv
-  ) %>%
-  # What is the first and last date of each service?
-  mutate(
-    first = min(FROM_DATE),
-    last = max(FROM_DATE)
-  ) %>%
-  # What is the number of units received?
-  summarize(
-    encounters = n(),
-    units = sum(UNITS, na.rm = T),
-    hrs = sum(hrs, na.rm = T),
-    first = min(FROM_DATE),
-    last = max(FROM_DATE)
-  ) 
-
-waitlist_summary <-
-  waitlist_last90 %>%
+  left_join(waitlist_last90, by = c("Case_ID")) %>%
   group_by(Case_ID,PIHP_CMH_Name) %>%
   summarize(encounters = sum(encounters)) %>%
   mutate(
@@ -848,7 +821,18 @@ waitlist_summary <-
   select(PIHP_CMH_Name,denominator,numerator,pct)
 
 waitlist_person <-
-  waitlist_all %>%
+  wsa %>%
+  # Filter individuals who are on waitlist
+  filter(Status == "Open") %>%
+  filter(Currently_Inactive == F) %>%
+  filter(is.na(Eligibility_Date) == F) %>%
+  select(ID,Case_ID,PIHP_CMH_Name,Referral_Date:Eligibility_End_Date) %>%
+  left_join(waitlist_svs, by = c("Case_ID")) %>%
+  rename(
+    PIHP_CMH_Name = PIHP_CMH_Name.x,
+    Eligibility_Date = Eligibility_Date.x
+  ) %>%
+  select(-PIHP_CMH_Name.y, -Eligibility_Date.y) %>%
   group_by(Case_ID,PIHP_CMH_Name) %>%
   summarize(
     first = min(first),
