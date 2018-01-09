@@ -120,14 +120,17 @@ wsa %>%
 ```{r bpos_create}
 bpos_tbl <-
 wsa %>%
-  filter(Status == "Open" & IPOSExists == T) %>%
+  filter(
+    Status == "Open" 
+    & Currently_Inactive == F
+    & IPOSExists == T) %>%
   mutate(
     past_due = IPOS_Due_Date < today()
   ) %>%
   group_by(PIHP_CMH_Name) %>%
   summarize(
     numerator = sum(past_due, na.rm = T),
-    denominator = n()
+    denominator = n_distinct(Case_ID)
   ) %>%
   mutate(
     pct = round(numerator / denominator * 100, digits = 1)
@@ -284,7 +287,8 @@ aba_rx_hrs <- wsa_ipos %>% select(MEDICAID_ID = Beneficiary_ID,Case_ID,ABA_Hours
 
 ipos_start <- 
   wsa %>% 
-  filter(Status == "Open" & Currently_Inactive == F) %>% 
+  filter(Status == "Open") %>%
+  filter(Currently_Inactive == F) %>%
   select(MEDICAID_ID = ID,IPOS_Start_Date)
 
 last_90 <- as.Date(max(svs$FROM_DATE, na.rm = T) - 90)
@@ -297,6 +301,11 @@ svs %>%
   ) %>%
   # Now remove observation codes
   filter(!CPT_CD %in% c("S5108","0368T","0369T")) %>%
+  # Only include services if they are in most recent 90 days of dataset
+  filter(
+    FROM_DATE >= last_90
+    | is.na(FROM_DATE) == T
+  ) %>%
   droplevels() %>%
   mutate(
     # Recode unit type as numeric conversion factor
@@ -317,16 +326,31 @@ svs %>%
   select(PROVIDER_NAME,MEDICAID_ID,CPT_CD:FROM_DATE,week,UNITS,hrs) 
 
 aba_summary <-
-  aba_svs %>%
+  # Start with WSA
+  wsa %>%
+  filter(Status == "Open") %>%
+  filter(Currently_Inactive == F) %>%
+  filter(IPOSExists == T) %>%
+  select(
+    MEDICAID_ID = ID,
+    PIHP_CMH_Name,
+    Case_ID
+  ) %>%
+  # Join with IPOS start date from WSA
+  left_join(ipos_start, by = "MEDICAID_ID") %>%
+  # Join to ABA services
+  left_join(aba_svs, by = "MEDICAID_ID") %>%
   # Get prescribed ABA hours from WSA IPOS
   left_join(aba_rx_hrs, by = "MEDICAID_ID") %>%
-  # Get IPOS start date from WSA
-  left_join(ipos_start, by = "MEDICAID_ID") %>%
+  # Remove Case IDs which are duplicated in IPOS dataset
+  rename(Case_ID = Case_ID.x) %>%
+  select(-Case_ID.y) %>%
   # Only include services if they occur after the IPOS Start Date
-  filter(FROM_DATE >= IPOS_Start_Date) %>%
-  # Only include services if they are in most recent 90 days of dataset
-  filter(FROM_DATE >= last_90) %>%
-  group_by(Case_ID,PROVIDER_NAME,week) %>%
+  filter(
+    FROM_DATE >= IPOS_Start_Date
+    | is.na(FROM_DATE) == T
+  ) %>%
+  group_by(Case_ID,PIHP_CMH_Name,week) %>%
   summarize(
     hrs = sum(hrs, na.rm = T),
     ABA_Hours = max(ABA_Hours)
@@ -336,14 +360,13 @@ aba_summary <-
     # Negative values indicate hours less than goal
     diff = hrs - ABA_Hours,
     # Calculate % of prescribed hours received
-    # Tag Compliant and Non-Compliant weeks
-   
     pct_all = round(sum(hrs) / sum(ABA_Hours) * 100, digits = 1),
+    # Tag Compliant and Non-Compliant weeks
     in_range_all = ifelse(between(pct_all,75,125),T,F)
   ) %>%
   ungroup() %>%
-  group_by(Case_ID,PROVIDER_NAME) %>%
-  summarise(
+  group_by(Case_ID,PIHP_CMH_Name) %>%
+  summarize(
     hrs = sum(hrs, na.rm = T),
     ABA_Hours = sum(ABA_Hours, na.rm = T)
   ) %>%
@@ -351,27 +374,27 @@ aba_summary <-
     pct = round(hrs / ABA_Hours * 100, digits = 1),
     in_range = ifelse(between(pct,75,125),T,F)
   ) %>%
-  group_by(PROVIDER_NAME) %>%
-  summarise(
+  group_by(PIHP_CMH_Name) %>%
+  summarize(
     in_range =  sum(in_range),
-    denominator = n()
+    denominator = n_distinct(Case_ID)
   ) %>%
   mutate(
     numerator = denominator - in_range,
     pct = round(numerator/denominator * 100, digits = 1)
   ) %>% 
-  select(PROVIDER_NAME,numerator,denominator,pct) %>%
-  arrange(as.character(PROVIDER_NAME)) %>%
+  select(PIHP_CMH_Name,numerator,denominator,pct) %>%
+  arrange(as.character(PIHP_CMH_Name)) %>%
   # Add subtotal line for PIHP
   rbind(
     ., 
     data.frame(
-      PROVIDER_NAME = "Region 10", 
+      PIHP_CMH_Name = "Region 10", 
       t(colSums(.[2:3])),
       pct = round(colSums(.[2])/colSums(.[3])*100,digits = 1)
     )
   ) %>%
-  select(PROVIDER_NAME,denominator,numerator,pct)
+  select(PIHP_CMH_Name,denominator,numerator,pct)
 
 aba_week <-
   aba_svs %>%
