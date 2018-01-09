@@ -446,7 +446,7 @@ aba_per <-
 aba_summary %>%
   datatable(
     rownames = FALSE,
-    colnames = c('Organization','Total Enrollees with a Behavioral Plan of Service','Enrollees Non-Compliant','% Non-Compliant'),
+    colnames = c('Organization','Total Enrollees with BPOS','Enrollees Non-Compliant','% Non-Compliant'),
     extensions = c('Responsive','Buttons'),
     options = list(
       dom = 't',
@@ -642,8 +642,21 @@ svs %>%
   mutate(has_fam = fam_svs > 0)
 
 family_summary <-
-family_svs %>%
-  group_by(PROVIDER_NAME) %>%
+  # Start with WSA
+  wsa %>%
+  filter(Status == "Open") %>%
+  filter(Currently_Inactive == F) %>%
+  filter(IPOSExists == T) %>%
+  select(
+    MEDICAID_ID = ID,
+    PIHP_CMH_Name,
+    Case_ID
+  ) %>%
+  left_join(family_svs, by = "Case_ID") %>%
+  # Remove Case IDs which are duplicated in IPOS dataset
+  # rename(Case_ID = Case_ID.x) %>%
+  # select(-Case_ID.y) %>%
+  group_by(PIHP_CMH_Name) %>%
   summarize(
     denominator = n_distinct(Case_ID),
     has_fam = sum(has_fam, na.rm = T)
@@ -652,18 +665,18 @@ family_svs %>%
     numerator = denominator - has_fam,
     pct = round(numerator / denominator * 100, digits = 1)
   ) %>% 
-  select(PROVIDER_NAME,numerator,denominator,pct) %>%
-  arrange(as.character(PROVIDER_NAME)) %>%
+  select(PIHP_CMH_Name,numerator,denominator,pct) %>%
+  arrange(as.character(PIHP_CMH_Name)) %>%
   # Add subtotal line for PIHP
   rbind(
     ., 
     data.frame(
-      PROVIDER_NAME = "Region 10", 
+      PIHP_CMH_Name = "Region 10", 
       t(colSums(.[2:3])),
       pct = round(colSums(.[2])/colSums(.[3])*100,digits = 1)
     )
   ) %>%
-  select(PROVIDER_NAME,denominator,numerator,pct)
+  select(PIHP_CMH_Name,denominator,numerator,pct)
 
 ```
 
@@ -715,11 +728,9 @@ family_svs %>%
 waitlist_svs <-
   wsa %>%
   # Filter individuals who are on waitlist
-  filter(
-    Status == "Open"
-    & IPOSExists == F
-    & is.na(Eligibility_Date) == F
-  ) %>%
+  filter(Status == "Open") %>%
+  filter(Currently_Inactive == F) %>%
+  filter(is.na(Eligibility_Date) == F) %>%
   select(ID,Case_ID,PIHP_CMH_Name,Referral_Date:Eligibility_End_Date) %>%
   left_join(svs, by = c("ID" = "MEDICAID_ID")) %>%
   filter(

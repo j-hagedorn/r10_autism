@@ -222,7 +222,10 @@ Enrollees approved for ABA and are awaiting the development of an ABA behavior t
 ```{r start_create}
 wsa_tbl <-
 wsa %>%
-  filter(Status == "Open") %>%
+  filter(
+    Status == "Open" 
+    & Currently_Inactive == F
+  ) %>%
   group_by(PIHP_CMH_Name) %>%
   summarize(
     ipos_exists = sum(IPOSExists, na.rm = T),
@@ -360,7 +363,7 @@ svs %>%
   ) %>%
   select(PROVIDER_NAME,MEDICAID_ID,CPT_CD:FROM_DATE,week,UNITS,hrs) 
 
-aba_summary tst <-
+aba_summary <-
   # Start with WSA
   wsa %>%
   filter(Status == "Open") %>%
@@ -437,7 +440,7 @@ aba_summary tst <-
 aba_summary %>%
   datatable(
     rownames = FALSE,
-    colnames = c('Organization','Total Enrollees with a Behavioral Plan of Service','Enrollees Non-Compliant','% Non-Compliant'),
+    colnames = c('Organization','Total Enrollees with BPOS','Enrollees Non-Compliant','% Non-Compliant'),
     extensions = c('Responsive','Buttons'),
     options = list(
       dom = 't',
