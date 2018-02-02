@@ -687,7 +687,6 @@ family_svs %>%
     colnames = c('WSA ID','Organization'),
     extensions = c('Responsive','Buttons'),
     options = list(
-      dom = 't',
       buttons = c('colvis'),
       pageLength = 10,
       lengthMenu = c(10, 25, 50, nrow(family_svs))
