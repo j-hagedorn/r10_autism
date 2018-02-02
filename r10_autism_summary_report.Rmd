@@ -34,7 +34,7 @@ wsa_ipos <- read_feather(paste0(csv_path,"wsa_ipos.feather"))
 
 ```
 
-<h4>This *summary* report was generated for Region 10 PIHP on `r Sys.Date()` using data from `r min(svs$FROM_DATE, na.rm = T)` - `r max(svs$FROM_DATE, na.rm = T)`</h4>
+<h4>This *summary* report was generated for Region 10 PIHP on `r Sys.Date()` using current WSA data and encounter data from `r min(svs$FROM_DATE, na.rm = T)` - `r max(svs$FROM_DATE, na.rm = T)`</h4>
 
 *Please note that the data in this report may not reflect all services that enrollees received from the Autism Benefit.  Specifically, services may not appear for more recent periods if claims have not yet been submitted.*
 
@@ -45,7 +45,10 @@ wsa_ipos <- read_feather(paste0(csv_path,"wsa_ipos.feather"))
 ```{r reeval_create}
 reeval_tbl <-
 wsa %>%
-  filter(Status == "Open") %>%
+  filter(
+    Status == "Open"
+    & Currently_Inactive == F
+  ) %>%
   mutate(
     past_due = ReEvaluation_Due_Date < today()
   ) %>%
@@ -114,7 +117,7 @@ reeval_tbl %>%
     )
   ) %>%
   layout(
-    title = "Compliance with Re-Evaluations",
+    title = "Non-Compliance with Re-Evaluations",
     xaxis = list(title = "", tickangle = 45),
     yaxis = list(
       title = "% of total enrollees with overdue re-evaluations",
@@ -134,7 +137,8 @@ wsa %>%
   filter(
     Status == "Open" 
     & Currently_Inactive == F
-    & IPOSExists == T) %>%
+    & IPOSExists == T
+  ) %>%
   mutate(
     past_due = IPOS_Due_Date < today()
   ) %>%
@@ -203,7 +207,7 @@ bpos_tbl %>%
     )
   ) %>%
   layout(
-    title = "Compliance with Updated Plans of Service",
+    title = "Non-Compliance with Updated Plans of Service",
     xaxis = list(title = "", tickangle = 45),
     yaxis = list(
       title = "% of total enrollees with overdue BPOS",
@@ -243,7 +247,7 @@ wsa %>%
     data.frame(
       PIHP_CMH_Name = "Region 10", 
       t(colSums(.[2:3])),
-      pct = round(colSums(.[2])/colSums(.[3])*100,digits = 1)
+      pct = round(colSums(.[3])/colSums(.[2])*100,digits = 1)
     )
   ) %>%
   select(PIHP_CMH_Name,denominator,numerator,pct)
@@ -293,10 +297,10 @@ wsa_tbl %>%
     )
   ) %>%
   layout(
-    title = "Overdue Start Date",
+    title = "Enrollees Without BPOS",
     xaxis = list(title = "", tickangle = 45),
     yaxis = list(
-      title = "% of total enrollees with overdue service start",
+      title = "% of total enrollees without BPOS",
       range = c(0, 100)
     ),
     margin = list(l = 60, r = 30, b = 150, t = 40, pad = 4)
@@ -309,7 +313,7 @@ wsa_tbl %>%
 
 # Range of Intensity Non-Compliance
 
-What percent of beneficiaries have received ABA services which fall outside of the acceptable range (*i.e. <75% or >125%*) of the prescribed hours?
+Percent of beneficiaries who have received ABA services which fall outside of the acceptable range (*i.e. <75% or >125%*) of the prescribed hours.
 
 ```{r roi_create}
 
