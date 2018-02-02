@@ -593,7 +593,7 @@ observe %>%
 
 # Family Training Non-Compliance
 
-The table below shows the number of individuals who received autism benefit services during the last 90 days, and the number of those individuals who did not receive family training services during that time.
+The table below shows the number of individuals with a BPOS, and the proportion of those individuals who did not receive family training services during the past 90 days.
 
 ```{r family_create}
 
@@ -659,7 +659,7 @@ family_summary <-
 family_summary %>%
   datatable(
     rownames = FALSE,
-    colnames = c('Organization','Total Enrollees Receiving Services','Without Family Services','% Non-Compliant'),
+    colnames = c('Organization','Total Enrollees with BPOS','Without Family Services','% Non-Compliant'),
     extensions = c('Responsive','Buttons'),
     options = list(
       dom = 't',
