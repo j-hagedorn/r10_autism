@@ -655,8 +655,6 @@ elig_date <- wsa %>% select(Case_ID,MEDICAID_ID = ID,PIHP_CMH_Name,Eligibility_D
 
 waitlist_svs <-
   svs %>%
-  # Exclude services marked as U5
-  filter(is.na(AUTISM_SRV)) %>%
   left_join(elig_date, by = "MEDICAID_ID") %>%
   filter(
     # Only include services occurring after eligibility for autism
