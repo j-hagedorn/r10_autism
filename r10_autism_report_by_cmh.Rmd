@@ -371,7 +371,7 @@ aba_summary <-
   aba_per %>%
   group_by(PIHP_CMH_Name) %>%
   summarize(
-    in_range =  sum(in_range),
+    in_range =  sum(in_range, na.rm = T),
     denominator = n_distinct(Case_ID)
   ) %>%
   mutate(
