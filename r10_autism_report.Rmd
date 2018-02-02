@@ -771,7 +771,6 @@ waitlist_svs_per <-
     first,last,encounter_mo
   )
 
-
 waitlist_person <-
   wsa %>%
   # Filter individuals who are on waitlist
@@ -874,7 +873,7 @@ Please note that the table below includes all services within the encounter data
 
 dt <- 
   waitlist_person %>%
-  filter(autism_waiver_svs == F) %>%
+  filter(is.na(autism_waiver_svs) | autism_waiver_svs == F) %>%
   select(Case_ID,encounter_mo,PIHP_CMH_Name,svs_list,elig_interval,encounters) %>%
   arrange(desc(elig_interval)) %>%
   datatable(
