@@ -888,9 +888,8 @@ dt <-
     options = list(
       columnDefs = cd,
       pageLength = 5,
-      lengthMenu = c(5, 15, 25, 50, nrow(t3)),
+      lengthMenu = c(5, 15, 25, 50, nrow(waitlist_person)),
       fnDrawCallback = cb,
-      # dom = 't',
       buttons = c('colvis'))
     )
 
@@ -911,10 +910,10 @@ Please note that the table below includes all services within the encounter data
 These individuals are shown in the table below:
 
 ```{r}
-dt <- t3 %>%
+dt <- 
+  waitlist_person %>%
   filter(autism_waiver_svs == T) %>%
-  filter(elig_interval >= 0) %>%
-  select(-autism_waiver_svs) %>%
+  select(Case_ID,encounter_mo,PIHP_CMH_Name,svs_list,elig_interval,encounters) %>%
   datatable(
     data.table(),
     caption = "ABA-inclusive Services provided to Enrollees Without a Behavioral Plan of Service",
@@ -926,7 +925,7 @@ dt <- t3 %>%
     options = list(
       columnDefs = cd,
       pageLength = 5,
-      lengthMenu = c(5, 15, 25, nrow(t3)),
+      lengthMenu = c(5, 15, 25, nrow(waitlist_person)),
       fnDrawCallback = cb,
       buttons = c('colvis'))
     )
