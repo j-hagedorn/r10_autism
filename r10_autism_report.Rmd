@@ -32,7 +32,7 @@ wsa_ipos <- read_feather("data/wsa_ipos.feather")
 
 ```
 
-<h4>This *full detail* report was generated for Region 10 PIHP on `r Sys.Date()` using data from `r min(svs$FROM_DATE, na.rm = T)` - `r max(svs$FROM_DATE, na.rm = T)`</h4>
+<h4>This *full detail* report was generated for Region 10 PIHP on `r Sys.Date()` using current WSA data and encounter data from `r min(svs$FROM_DATE, na.rm = T)` - `r max(svs$FROM_DATE, na.rm = T)`</h4>
 
 *Please note that the data in this report may not reflect all services that enrollees received from the Autism Benefit.  Specifically, services may not appear for more recent periods if claims have not yet been submitted.*
 
@@ -43,7 +43,10 @@ wsa_ipos <- read_feather("data/wsa_ipos.feather")
 ```{r reeval_create}
 reeval_tbl <-
 wsa %>%
-  filter(Status == "Open") %>%
+  filter(
+    Status == "Open"
+    & Currently_Inactive == F
+  ) %>%
   mutate(
     past_due = ReEvaluation_Due_Date < today()
   ) %>%
@@ -93,8 +96,10 @@ The table below shows all open individuals with an overdue re-evaluation:
 
 ```{r reeval_detail}
 wsa %>%
-  filter(Status == "Open") %>%
-  mutate(
+  filter(
+    Status == "Open"
+    & Currently_Inactive == F
+  ) %>%  mutate(
     past_due = ReEvaluation_Due_Date < today()
   ) %>%
   filter(past_due == T) %>%
@@ -204,7 +209,10 @@ Enrollees approved for ABA and are awaiting the development of an ABA behavior t
 ```{r start_create}
 wsa_tbl <-
 wsa %>%
-  filter(Status == "Open") %>%
+  filter(
+    Status == "Open"
+    & Currently_Inactive == F
+  ) %>%  
   group_by(PIHP_CMH_Name) %>%
   summarize(
     numerator = n() - sum(IPOSExists, na.rm = T),
@@ -251,7 +259,10 @@ The table below shows all open individuals without a Behavioral Plan of Service:
 
 ```{r start_detail}
 wsa %>%
-  filter(Status == "Open") %>%
+  filter(
+    Status == "Open"
+    & Currently_Inactive == F
+  ) %>%
   filter(IPOSExists == F) %>%
   select(Case_ID,PIHP_CMH_Name,Eligibility_Date) %>%
   mutate(
@@ -325,7 +336,7 @@ svs %>%
   ) %>%
   select(PROVIDER_NAME,MEDICAID_ID,CPT_CD:FROM_DATE,week,UNITS,hrs) 
 
-aba_summary <-
+aba_week <-
   # Start with WSA
   wsa %>%
   filter(Status == "Open") %>%
@@ -364,7 +375,10 @@ aba_summary <-
     # Tag Compliant and Non-Compliant weeks
     in_range_all = ifelse(between(pct_all,75,125),T,F)
   ) %>%
-  ungroup() %>%
+  ungroup()
+
+aba_per <-
+  aba_week %>%
   group_by(Case_ID,PIHP_CMH_Name) %>%
   summarize(
     hrs = sum(hrs, na.rm = T),
@@ -373,7 +387,10 @@ aba_summary <-
   mutate(
     pct = round(hrs / ABA_Hours * 100, digits = 1),
     in_range = ifelse(between(pct,75,125),T,F)
-  ) %>%
+  )
+
+aba_summary <-
+  aba_per %>%
   group_by(PIHP_CMH_Name) %>%
   summarize(
     in_range =  sum(in_range),
@@ -396,49 +413,7 @@ aba_summary <-
   ) %>%
   select(PIHP_CMH_Name,denominator,numerator,pct)
 
-aba_week <-
-  aba_svs %>%
-  # Get prescribed ABA hours from WSA IPOS
-  left_join(aba_rx_hrs, by = "MEDICAID_ID") %>%
-  # Get IPOS start date from WSA
-  left_join(ipos_start, by = "MEDICAID_ID") %>%
-  # Only include services if they occur after the IPOS Start Date
-  filter(FROM_DATE >= as.Date(IPOS_Start_Date)) %>%
-  # Only include services if they are in most recent 90 days of dataset
-  filter(FROM_DATE >= last_90) %>%
-  group_by(Case_ID,PROVIDER_NAME,week) %>%
-  summarize(
-    hrs = sum(hrs, na.rm = T),
-    ABA_Hours = max(ABA_Hours, na.rm = T)
-  ) %>%
-  ungroup() %>%
-  mutate(
-    # Calculate difference between actual and prescribed hours
-    # Negative values indicate hours less than goal
-    diff = hrs - ABA_Hours,
-    # Calculate % of prescribed hours received
-    pct = round(hrs / ABA_Hours * 100, digits = 1),
-    # Tag Compliant and Non-Compliant weeks
-    in_range_wk = ifelse(between(pct,75,125),T,F)
-  ) %>%
-  ungroup() %>%
-  group_by(Case_ID,PROVIDER_NAME) %>%
-  mutate(
-    pct_all = round(sum(hrs) / sum(ABA_Hours) * 100, digits = 1),
-    in_range_all = ifelse(between(pct_all,75,125),T,F)
-  ) 
-
-aba_per <-
-  aba_week %>%
-  group_by(Case_ID,PROVIDER_NAME) %>%
-  summarize(
-    hrs = sum(hrs, na.rm = T),
-    rx_hrs = sum(ABA_Hours, na.rm = T)
-  ) %>%
-  mutate(
-    pct = round(hrs / rx_hrs * 100, digits = 1),
-    in_range = ifelse(between(pct,75,125),T,F)
-  )
+ 
 
 ```
 
@@ -472,7 +447,7 @@ aba_per %>%
     colnames = c('WSA ID','Organization','Hours of Treatment','Prescribed Hours','% of Prescribed Hours'),
     options = list(
       pageLength = 5,
-      lengthMenu = c(5, 15, 25, 50, nrow(aba_per))
+      lengthMenu = c(5, 15, 25, 50, n_distinct(aba_per$Case_ID[aba_per$in_range == F]))
     )
   )
 ```
@@ -618,7 +593,7 @@ observe %>%
 
 # Family Training Non-Compliance
 
-The table below shows the number of individuals who received autism benefit services during the last 90 days, and the number of those individuals who received family training services during that time.
+The table below shows the number of individuals who received autism benefit services during the last 90 days, and the number of those individuals who did not receive family training services during that time.
 
 ```{r family_create}
 
@@ -790,7 +765,7 @@ waitlist_summary <-
   # Filter individuals who are on waitlist
   filter(Status == "Open") %>%
   filter(Currently_Inactive == F) %>%
-  filter(is.na(Eligibility_Date) == F) %>%
+  filter(IPOSExists == F) %>%
   select(ID,Case_ID,PIHP_CMH_Name,Referral_Date:Eligibility_End_Date) %>%
   left_join(waitlist_last90, by = c("Case_ID")) %>%
   group_by(Case_ID,PIHP_CMH_Name) %>%
@@ -825,7 +800,7 @@ waitlist_person <-
   # Filter individuals who are on waitlist
   filter(Status == "Open") %>%
   filter(Currently_Inactive == F) %>%
-  filter(is.na(Eligibility_Date) == F) %>%
+  filter(IPOSExists == F) %>%
   select(ID,Case_ID,PIHP_CMH_Name,Referral_Date:Eligibility_End_Date) %>%
   left_join(waitlist_svs, by = c("Case_ID")) %>%
   rename(
@@ -845,9 +820,9 @@ waitlist_person <-
   mutate(
     # Most recent date in services data pulled
     max_date = max(svs$FROM_DATE, na.rm = T),
-    elig_interval = as.numeric(max_date - (Eligibility_Date + 90)),
-    svs_interval = as.numeric(last - first),
-    pct_days_svd = round(svs_interval/elig_interval * 100, digits = 1),
+    elig_interval = as.numeric(today() - as.Date(Eligibility_Date)),
+    # svs_interval = as.numeric(last - first),
+    # pct_days_svd = round(svs_interval/elig_interval * 100, digits = 1),
     autism_waiver_svs = autism_waiver_svs > 0
   )
 
@@ -930,9 +905,11 @@ cb <-
 The table below includes the following information:
 
 - *Encounters per month*: A trendline of the number of encounters the individual received per month during the time they have been without a BPOS.
-- *Services provided*: A list of all non-ABA services which appear in the encounter data for the enrollee from the time that s/he was enrolled in the Autism Benefit.
+- *Services provided*: A list of all non-ABA services which appear in the encounter data for the enrollee from the time that s/he was enrolled in the Autism Benefit.  Specifically, services are included if they fall within the time period from `r min(svs$FROM_DATE, na.rm = T)` - `r max(svs$FROM_DATE, na.rm = T)`, but services are filtered out for a given individual if they occur prior to that person's eligibility date.
 - *Days without BPOS*: The number of days that the individual has been without a BPOS.
 - *Total Encounters*: The total number of encounters, for any type of service, that the individual received while without a BPOS.
+
+Please note that the table below includes all services within the encounter data time range, and not only the most recent 90 days, as in the table above.
 
 ```{r waitlist_detail}
 
@@ -968,6 +945,8 @@ dt
 # ABA Services for Enrollees Without a Behavioral Plan of Service
 
 Some individuals are shown as not having a BPOS in the WSA system, but their service data shows that they have received ABA services.  This may indicate the need to update the individuals' status in the WSA system.  Note that addressing these changes in the WSA system will improve performance on the *Enrollees without a Behavioral Plan of Service* measure above.
+
+Please note that the table below includes all services within the encounter data time range, and not only the most recent 90 days.
 
 These individuals are shown in the table below:
 
