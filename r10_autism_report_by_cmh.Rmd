@@ -668,35 +668,15 @@ waitlist_svs <-
     month = floor_date(FROM_DATE, unit = "month")
   ) 
 
-rem_dup.one <- function(x){
-  paste(
-    unique(
-      trimws(
-        unlist(
-          strsplit(
-            x,
-            split = "(?!')[ [:punct:]]",
-            fixed = F,
-            perl = T
-          )
-        )
-      )
-    ),
-    collapse = " "
-  )
-}
-rem_dup.vector <- Vectorize(rem_dup.one,USE.NAMES = F)
-
 waitlist_svs_per <-
   waitlist_svs %>%
-  group_by(Case_ID,month) %>%
+  group_by(Case_ID,month,SERVICE_DESC) %>%
   # What is the number of units received?
   summarize(
     encounters = n(),
     units = sum(UNITS, na.rm = T),
     first = min(FROM_DATE),
     last = max(FROM_DATE),
-    svs_list = paste(SERVICE_DESC, collapse = ', '),
     in_last_90 = sum(last_90_log),
     autism_waiver_svs = sum(AUTISM_SRV, na.rm = T)
   ) %>%
@@ -707,12 +687,11 @@ waitlist_svs_per <-
     units = sum(units),
     first = min(first),
     last = max(last),
-    svs_list = paste(unique(svs_list), collapse = ', '),
+    svs_list = paste(unique(SERVICE_DESC), collapse = ', '),
     in_last_90 = sum(in_last_90),
     autism_waiver_svs = sum(autism_waiver_svs, na.rm = T)
   ) %>%
   # Remove duplicates from list
-  mutate(svs_list = rem_dup.vector(svs_list)) %>%
   ungroup() %>%
   select(
     Case_ID,svs_list,encounters,units,in_last_90,autism_waiver_svs,
