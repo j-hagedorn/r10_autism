@@ -858,7 +858,6 @@ dt <-
   arrange(desc(elig_interval)) %>%
   datatable(
     data.table(),
-    caption = "Non-ABA Services provided to Enrollees Without a Behavioral Plan of Service",
     rownames = FALSE,
     colnames = c('WSA ID','Encounters per month',
                  'Organization','Services provided',
