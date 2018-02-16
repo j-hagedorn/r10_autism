@@ -884,7 +884,7 @@ dt
 
 Some individuals are shown as not having a BPOS in the WSA system, but their service data shows that they have received ABA services.  This may indicate the need to update the individuals' status in the WSA system.  Note that addressing these changes in the WSA system will improve performance on the *Enrollees without a Behavioral Plan of Service* measure above.
 
-Please note that the table below includes all services within the encounter data time range, and not only the most recent 90 days.
+Please note that the table below includes all services within the encounter data time range, and not only the most recent 90 days.  Also note that the group of services received by a person is tagged as containing one or more ABA services, but may include services other than ABA services.
 
 These individuals are shown in the table below:
 
