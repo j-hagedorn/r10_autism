@@ -14,14 +14,14 @@ wsa %<>%
     Case_ID = as.character(Case_ID)
   ) %>%
   mutate_at(
-    .cols = vars(Days_Bet_Ref_Eval,Days_Bet_Elig_IPOS),
+    .vars = vars(Days_Bet_Ref_Eval,Days_Bet_Elig_IPOS),
     .funs = funs(as.numeric)
   ) %>%
   # Change all character columns to factors
   mutate_if(is.character,as.factor) %>%
   # Transform Y/N responses into logical vars
   mutate_at(
-    .cols = vars(
+    .vars = vars(
       IPOSExists,
       Telepractice_Authorization_Requested,
       Currently_Inactive,
@@ -56,14 +56,14 @@ wsa_ipos %<>%
     Case_ID = as.character(Case_ID)
   ) %>%
   mutate_at(
-    .cols = vars(Days_Without_IPOS,Next_IPOS_Due_In,ABA_Hours),
+    .vars = vars(Days_Without_IPOS,Next_IPOS_Due_In,ABA_Hours),
     .funs = funs(as.numeric)
   ) %>%
   # Change all character columns to factors
   mutate_if(is.character,as.factor) %>%
   # Transform Y/N responses into logical vars
   mutate_at(
-    .cols = vars(IPOS_Exists),
+    .vars = vars(IPOS_Exists),
     .funs = funs(. == "Yes")
   ) %>%
   mutate(
