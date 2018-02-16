@@ -325,7 +325,11 @@ aba_cpt <- c("S5108", # Old observation code
              "0364T","0365T","0366T","0367T","0372T","0373T","0374T",
              "0368T","0369T") # Observation codes
 
-aba_rx_hrs <- wsa_ipos %>% select(MEDICAID_ID = Beneficiary_ID,Case_ID,ABA_Hours)
+aba_rx_hrs <- 
+  wsa_ipos %>%
+  filter(Status == "Open") %>%
+  filter(IPOS_Exists == T) %>% 
+  select(MEDICAID_ID = Beneficiary_ID,Case_ID,ABA_Hours)
 
 ipos_start <- 
   wsa %>% 
