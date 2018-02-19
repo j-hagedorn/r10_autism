@@ -74,8 +74,22 @@ svs %>%
   mutate_if(is.character,as.factor) %>%
   # Clean date fields to prepare for analysis
   mutate(
-    FROM_DATE = mdy(FROM_DATE),
-    THRU_DATE = mdy(THRU_DATE)
+    FROM_DATE = str_trim(FROM_DATE),
+    FROM_DATE = case_when(
+      # If it is formatted as a date (with /)
+      grepl("/",FROM_DATE) == T        ~ mdy(FROM_DATE),
+      # If it can be converted to numeric (from string).
+      # Note: uses the Unix epoch of "1970-01-01"
+      is.na(as.numeric(FROM_DATE)) == F ~ as.Date(as.numeric(FROM_DATE), origin = "1970-01-01")
+    ),
+    THRU_DATE = str_trim(THRU_DATE),
+    THRU_DATE = case_when(
+      # If it is formatted as a date (with /)
+      grepl("/",THRU_DATE) == T        ~ mdy(THRU_DATE),
+      # If it can be converted to numeric (from string).
+      # Note: uses the Unix epoch of "1970-01-01"
+      is.na(as.numeric(THRU_DATE)) == F ~ as.Date(as.numeric(THRU_DATE), origin = "1970-01-01")
+    )
   ) %>%
   # Transform Y/N responses into logical vars
   mutate_at(
