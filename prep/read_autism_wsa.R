@@ -3,7 +3,7 @@ library(tidyverse); library(readxl)
 
 # Read in .csv files as dataframes
 csv_path <- "C:/Users/joshh/OneDrive - TBD Solutions LLC/files/Region10/Autism/"
-wsa <- read_excel(paste0(csv_path,"WSA All Cases All Data 05-30-17.xls"), skip = 1)
+wsa <- read_excel(paste0(csv_path,"WSA All Cases All Data.xls"), skip = 1)
 
 # Clean colnames (rm spaces, other symbols, add underscore sep)
 names(wsa) <- gsub(" |-|/", "_", names(wsa))
@@ -45,7 +45,7 @@ wsa %<>%
 
 # Read in data related to authorized units
 
-wsa_ipos <- read_excel(paste0(csv_path,"06-08-17 WSA IPOS Data Report.xls"), skip = 1)
+wsa_ipos <- read_excel(paste0(csv_path,"WSA IPOS Data.xls"), skip = 1)
 
 # Clean colnames (rm spaces, other symbols, add underscore sep)
 names(wsa_ipos) <- gsub(" |-|/", "_", names(wsa_ipos))
