@@ -353,13 +353,13 @@ aba_week <-
   ) %>%
   # Join with IPOS start date from WSA
   left_join(ipos_start, by = "MEDICAID_ID") %>%
-  # Join to ABA services
-  left_join(aba_svs, by = "MEDICAID_ID") %>%
   # Get prescribed ABA hours from WSA IPOS
   left_join(aba_rx_hrs, by = "MEDICAID_ID") %>%
   # Remove Case IDs which are duplicated in IPOS dataset
   rename(Case_ID = Case_ID.x) %>%
   select(-Case_ID.y) %>%
+  # Join to ABA services
+  left_join(aba_svs, by = "MEDICAID_ID") %>%
   # Only include services if they occur after the IPOS Start Date
   filter(
     FROM_DATE >= IPOS_Start_Date
