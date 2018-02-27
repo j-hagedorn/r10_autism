@@ -300,12 +300,6 @@ aba_rx_hrs <-
   filter(IPOS_Exists == T) %>% 
   select(MEDICAID_ID = Beneficiary_ID,Case_ID,ABA_Hours)
 
-ipos_start <- 
-  wsa %>% 
-  filter(Status == "Open") %>%
-  filter(Currently_Inactive == F) %>%
-  select(MEDICAID_ID = ID,IPOS_Start_Date)
-
 last_90 <- as.Date(max(svs$FROM_DATE, na.rm = T) - 90)
 
 aba_svs <-
@@ -349,10 +343,10 @@ aba_week <-
   select(
     MEDICAID_ID = ID,
     PIHP_CMH_Name,
-    Case_ID
+    Case_ID,
+    IPOS_Start_Date,
+    IPOS_Due_Date
   ) %>%
-  # Join with IPOS start date from WSA
-  left_join(ipos_start, by = "MEDICAID_ID") %>%
   # Get prescribed ABA hours from WSA IPOS
   left_join(aba_rx_hrs, by = "MEDICAID_ID") %>%
   # Remove Case IDs which are duplicated in IPOS dataset
@@ -360,11 +354,10 @@ aba_week <-
   select(-Case_ID.y) %>%
   # Join to ABA services
   left_join(aba_svs, by = "MEDICAID_ID") %>%
-  # Only include services if they occur after the IPOS Start Date
-  filter(
-    FROM_DATE >= IPOS_Start_Date
-    | is.na(FROM_DATE) == T
-  ) %>%
+  # Only include services if they occur between IPOS Start and Due Date
+  filter(FROM_DATE >= IPOS_Start_Date & FROM_DATE <= IPOS_Due_Date) %>%
+  # Remove services with empty dates
+  filter(is.na(FROM_DATE) == F) %>%
   group_by(Case_ID,PIHP_CMH_Name,week) %>%
   summarize(
     hrs = sum(hrs, na.rm = T),
@@ -386,10 +379,16 @@ aba_per <-
   group_by(Case_ID,PIHP_CMH_Name) %>%
   summarize(
     hrs = sum(hrs, na.rm = T),
+    aba_hrs_wk = max(ABA_Hours),
     ABA_Hours = sum(ABA_Hours, na.rm = T)
   ) %>%
   mutate(
-    pct = round(hrs / ABA_Hours * 100, digits = 1),
+    # Divide the total number of hours during the 90 days 
+    # by the total number of prescribed hours during that 
+    # timeframe (using a 7-day week, 90/7 = 12.85714)
+    pct = round(hrs / (aba_hrs_wk * 12.85714) * 100, digits = 1),
+    # Percent using weekly groupings
+    pct_wk = round(hrs / ABA_Hours * 100, digits = 1),
     in_range = ifelse(between(pct,75,125),T,F)
   )
 
@@ -417,8 +416,6 @@ aba_summary <-
   ) %>%
   select(PIHP_CMH_Name,denominator,numerator,pct)
 
- 
-
 ```
 
 ```{r roi_table}
@@ -444,11 +441,12 @@ aba_summary %>%
 ```{r roi_detail}
 aba_per %>% 
   filter(in_range == F) %>% 
-  select(-in_range) %>%
+  select(-in_range,-pct_wk,-ABA_Hours) %>%
   arrange(desc(pct)) %>%
   datatable(
+    caption = "ABA Hours of Treatment during Last 90 Days",
     rownames = FALSE,
-    colnames = c('WSA ID','Organization','Hours of Treatment','Prescribed Hours','% of Prescribed Hours'),
+    colnames = c('WSA ID','Organization','Hours of Treatment','Prescribed Hours per Week','% of Prescribed Hours'),
     options = list(
       pageLength = 5,
       lengthMenu = c(5, 15, 25, 50, n_distinct(aba_per$Case_ID[aba_per$in_range == F]))
@@ -456,12 +454,20 @@ aba_per %>%
   )
 ```
 
+*Note:* Because the number of prescribed hours of ABA treatment per week is potentially updated in the WSA data with each revision to the IPOS, and because the WSA data extract only includes the most recent value, there are times where a current prescribed hours value is being applied to a previous period of time where there was actually a different expectation. While the impact of this is limited due to the 90-day timeframe of the report, there is potential for some inaccuracy.  Specifically, if prescribed hours increase, there is a greater likelihood that individuals will be falsely tagged as non-compliant. On the other hand, if prescribed hours decrease, there is a greater likelihood that individuals will be falsely tagged as compliant.
+
 ---
 
 # Observation Non-Compliance
 
 ```{r observe_create}
 # Note: uses filters defined above for service codes and clients included
+
+ipos_start <- 
+  wsa %>% 
+  filter(Status == "Open") %>%
+  filter(Currently_Inactive == F) %>%
+  select(MEDICAID_ID = ID,IPOS_Start_Date,IPOS_Due_Date)
 
 observe <-
 svs %>%
@@ -491,8 +497,8 @@ svs %>%
   left_join(aba_rx_hrs, by = "MEDICAID_ID") %>%
   # Get IPOS start date from WSA
   left_join(ipos_start, by = "MEDICAID_ID") %>%
-  # Only include services if they occur after the IPOS Start Date
-  filter(week >= IPOS_Start_Date) %>%
+  # Only include services if they occur between IPOS Start and Due Date
+  filter(FROM_DATE >= IPOS_Start_Date & FROM_DATE <= IPOS_Due_Date) %>%
   # Only include services if they are in most recent 90 days of dataset
   filter(FROM_DATE >= last_90) %>%
   mutate(

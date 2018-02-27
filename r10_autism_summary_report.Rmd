@@ -414,10 +414,16 @@ aba_summary <-
   group_by(Case_ID,PIHP_CMH_Name) %>%
   summarize(
     hrs = sum(hrs, na.rm = T),
+    aba_hrs_wk = max(ABA_Hours),
     ABA_Hours = sum(ABA_Hours, na.rm = T)
   ) %>%
   mutate(
-    pct = round(hrs / ABA_Hours * 100, digits = 1),
+    # Divide the total number of hours during the 90 days 
+    # by the total number of prescribed hours during that 
+    # timeframe (using a 7-day week, 90/7 = 12.85714)
+    pct = round(hrs / (aba_hrs_wk * 12.85714) * 100, digits = 1),
+    # Percent using weekly groupings
+    pct_wk = round(hrs / ABA_Hours * 100, digits = 1),
     in_range = ifelse(between(pct,75,125),T,F)
   ) %>%
   group_by(PIHP_CMH_Name) %>%
