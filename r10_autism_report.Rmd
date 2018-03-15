@@ -454,7 +454,9 @@ aba_per %>%
   )
 ```
 
-*Note:* Because the number of prescribed hours of ABA treatment per week is potentially updated in the WSA data with each revision to the IPOS, and because the WSA data extract only includes the most recent value, there are times where a current prescribed hours value is being applied to a previous period of time where there was actually a different expectation. While the impact of this is limited due to the 90-day timeframe of the report, there is potential for some inaccuracy.  Specifically, if prescribed hours increase, there is a greater likelihood that individuals will be falsely tagged as non-compliant. On the other hand, if prescribed hours decrease, there is a greater likelihood that individuals will be falsely tagged as compliant.
+*Note:* Because the table above covers a 90-day window, the 'Prescribed Hours per Week' field is adjusted to match the 90-day timeframe, using a 7-day week, and is thus multiplied by 12.85714 to serve as the denominator (90/7 = 12.85714).
+
+Because the number of prescribed hours of ABA treatment per week is potentially updated in the WSA data with each revision to the IPOS, and because the WSA data extract only includes the most recent value, there are times where a current prescribed hours value is being applied to a previous period of time where there was actually a different expectation. While the impact of this is limited due to the 90-day timeframe of the report, there is potential for some inaccuracy.  Specifically, if prescribed hours increase, there is a greater likelihood that individuals will be falsely tagged as non-compliant. On the other hand, if prescribed hours decrease, there is a greater likelihood that individuals will be falsely tagged as compliant.
 
 ---
 
